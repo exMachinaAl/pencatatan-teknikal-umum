@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\SuratKeluarResource\Pages;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
@@ -11,11 +12,12 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Response;
 
 class SuratKeluarResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = SuratKeluar::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
@@ -28,6 +30,11 @@ class SuratKeluarResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    protected static function accessModule(): string
+    {
+        return 'surat';
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -36,28 +43,17 @@ class SuratKeluarResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('nomor_surat')
                             ->label('Nomor Surat Keluar')
-                            ->helperText('Dihasilkan otomatis saat pembuatan baru sesuai urutan tahun')
-                            ->default(function () {
-                                $data = SuratKeluar::generateNomorSurat();
-                                return $data['nomor_surat'];
-                            })
+                            ->helperText('Isi sesuai nomor resmi yang telah ditetapkan sekolah.')
+                            ->placeholder('Contoh: 421.1/001/SMAN1/2026')
                             ->required()
-                            ->unique(ignoreRecord: true),
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(100),
 
                         Forms\Components\DatePicker::make('tanggal_surat')
                             ->label('Tanggal Surat')
                             ->default(now())
                             ->required()
                             ->displayFormat('d/m/Y'),
-
-                        Forms\Components\Hidden::make('nomor_urut')
-                            ->default(function () {
-                                $data = SuratKeluar::generateNomorSurat();
-                                return $data['nomor_urut'];
-                            }),
-
-                        Forms\Components\Hidden::make('tahun')
-                            ->default(fn () => (int) date('Y')),
 
                         Forms\Components\TextInput::make('tujuan')
                             ->label('Tujuan Surat / Penerima')
@@ -122,6 +118,41 @@ class SuratKeluarResource extends Resource
                             ->placeholder('https://drive.google.com/...')
                             ->url()
                             ->columnSpanFull(),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Relasi Surat & Pengiriman')
+                    ->description('Hubungkan surat balasan dan catat bukti pengiriman.')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\Select::make('suratMasukTerkait')
+                            ->label('Membalas Surat Masuk')
+                            ->relationship('suratMasukTerkait', 'nomor_surat')
+                            ->getOptionLabelFromRecordUsing(fn ($record) => ($record->nomor_surat ?: 'Tanpa nomor surat').' — '.$record->pengirim.' — '.$record->perihal." (Agenda: {$record->nomor_agenda})")
+                            ->multiple()
+                            ->searchable(['nomor_surat', 'nomor_agenda', 'pengirim', 'perihal'])
+                            ->preload()
+                            ->columnSpanFull(),
+                        Forms\Components\Select::make('metode_pengiriman')
+                            ->label('Metode Pengiriman')
+                            ->options(['kurir' => 'Kurir', 'pos' => 'Pos', 'email' => 'Email', 'diambil' => 'Diambil langsung', 'lainnya' => 'Lainnya']),
+                        Forms\Components\TextInput::make('nomor_resi')
+                            ->label('Nomor Resi / Referensi'),
+                        Forms\Components\DateTimePicker::make('dikirim_pada')
+                            ->label('Dikirim Pada')
+                            ->seconds(false),
+                        Forms\Components\DateTimePicker::make('diterima_pada')
+                            ->label('Diterima Pada')
+                            ->seconds(false),
+                        Forms\Components\TextInput::make('diterima_oleh')
+                            ->label('Diterima Oleh'),
+                        Forms\Components\FileUpload::make('bukti_pengiriman_path')
+                            ->label('Bukti Pengiriman / Penerimaan')
+                            ->disk('local')
+                            ->directory('bukti_pengiriman')
+                            ->visibility('private')
+                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                            ->maxSize(5120),
                     ])->columns(2),
             ]);
     }
@@ -214,11 +245,37 @@ class SuratKeluarResource extends Resource
                         ->label('Tandai Terkirim')
                         ->icon('heroicon-o-check')
                         ->color('success')
-                        ->action(fn (SuratKeluar $record) => $record->update(['status' => 'terkirim'])),
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (SuratKeluar $record): bool => $record->status === 'draf')
+                        ->form([
+                            Forms\Components\Select::make('metode_pengiriman')
+                                ->label('Metode Pengiriman')
+                                ->options(['kurir' => 'Kurir', 'pos' => 'Pos', 'email' => 'Email', 'diambil' => 'Diambil langsung', 'lainnya' => 'Lainnya'])
+                                ->default('lainnya'),
+                            Forms\Components\TextInput::make('nomor_resi')->label('Nomor Resi / Referensi'),
+                            Forms\Components\DateTimePicker::make('dikirim_pada')->label('Waktu Pengiriman')->default(now())->seconds(false),
+                            Forms\Components\FileUpload::make('bukti_pengiriman_path')
+                                ->label('Bukti Pengiriman')
+                                ->disk('local')->directory('bukti_pengiriman')->visibility('private')
+                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])->maxSize(5120),
+                        ])
+                        ->action(function (SuratKeluar $record, array $data) {
+                            static::authorizeResourceAction('transition');
+                            $record->update([
+                                'status' => 'terkirim',
+                                'metode_pengiriman' => $data['metode_pengiriman'] ?? 'lainnya',
+                                'nomor_resi' => $data['nomor_resi'] ?? null,
+                                'dikirim_pada' => $data['dikirim_pada'] ?? now(),
+                                'bukti_pengiriman_path' => $data['bukti_pengiriman_path'] ?? null,
+                            ]);
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('arsipkan')
                         ->label('Tandai Diarsipkan')
                         ->icon('heroicon-o-archive-box')
                         ->color('gray')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (SuratKeluar $record): bool => $record->status === 'terkirim')
                         ->form([
                             Forms\Components\TextInput::make('lokasi_arsip_fisik')
                                 ->label('Lokasi Arsip Fisik')
@@ -226,12 +283,33 @@ class SuratKeluarResource extends Resource
                                 ->required(),
                         ])
                         ->action(function (SuratKeluar $record, array $data) {
+                            static::authorizeResourceAction('transition');
                             $record->update([
                                 'status' => 'diarsipkan',
                                 'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
                                 'diarsipkan_pada' => now(),
                             ]);
-                        }),
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
+                    Tables\Actions\Action::make('catat_diterima')
+                        ->label('Catat Bukti Diterima')
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->color('info')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (SuratKeluar $record): bool => $record->status === 'terkirim' && ! $record->diterima_pada)
+                        ->form([
+                            Forms\Components\TextInput::make('diterima_oleh')->label('Diterima Oleh')->required(),
+                            Forms\Components\DateTimePicker::make('diterima_pada')->label('Waktu Diterima')->default(now())->required()->seconds(false),
+                            Forms\Components\FileUpload::make('bukti_pengiriman_path')
+                                ->label('Bukti Diterima')
+                                ->disk('local')->directory('bukti_pengiriman')->visibility('private')
+                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])->maxSize(5120),
+                        ])
+                        ->action(function (SuratKeluar $record, array $data) {
+                            static::authorizeResourceAction('transition');
+                            $record->update($data);
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -241,10 +319,12 @@ class SuratKeluarResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="surat-keluar-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="surat-keluar-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records) {

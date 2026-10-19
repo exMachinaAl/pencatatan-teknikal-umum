@@ -1,0 +1,15 @@
+{
+    "patch_id": "TU-UI-V1_2-SAFE",
+    "status": "applied",
+    "applied_at": "2026-10-19T02:48:32+00:00",
+    "old_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "cbd0991ea6ada733d6b753001a5fefac1a20ef59b497e3515baabba1dc83e4f0",
+        "public/css/tu-ui-v12-safe.css": null
+    },
+    "new_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "51e58e7b319d93d5b553cb9e1ff2e5f4c76f20e9128d9040c299eca7f2ba5a9c",
+        "public/css/tu-ui-v12-safe.css": "e56f827c9fd69cf1c7301e50163756d4b8a13edf16f62e664c5db79b90d99e15"
+    },
+    "css_old_exists": false,
+    "backup_dir": ".trash/TU-UI-V1_2-SAFE"
+}

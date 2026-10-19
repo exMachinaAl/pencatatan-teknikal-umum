@@ -1,0 +1,10 @@
+{
+    "patch_id": "TU-V3_1-PERSONNEL-EXCHANGE",
+    "status": "applied",
+    "applied_at": "2026-10-19T09:31:10+00:00",
+    "files": {
+        "app/Filament/Pages/TuPersonnelExchangePage.php": "8495b9971e0e1e496607b6a078c4280869416709399d58f87c9520ce73313e9e",
+        "app/Services/TuPersonnelExchange.php": "858e6bd15b8521ad2929c4911a8d622891ad848f11587eadc0f34d78ec1a0b2b",
+        "resources/views/filament/pages/tu-personnel-exchange.blade.php": "53f46889554923e6d33f898d8a0c1add245147a1df6c88a4793bff6b2371605d"
+    }
+}

@@ -14,6 +14,30 @@ html {
     background: var(--tu-canvas);
 }
 
+.tu-request-error {
+    position: fixed;
+    z-index: 100;
+    right: 1rem;
+    bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    max-width: min(28rem, calc(100vw - 2rem));
+    padding: 0.85rem 1rem;
+    border: 1px solid #9f3f36;
+    border-radius: 0.35rem;
+    background: var(--tu-surface);
+    color: var(--tu-ink);
+    font-size: 0.8rem;
+}
+
+.tu-request-error button {
+    flex: 0 0 auto;
+    border-bottom: 1px solid currentColor;
+    color: #9f3f36;
+    font-weight: 700;
+}
+
 .fi-body {
     background-color: var(--tu-canvas) !important;
 }

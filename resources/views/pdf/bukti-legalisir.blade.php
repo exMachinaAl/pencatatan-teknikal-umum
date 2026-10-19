@@ -110,6 +110,11 @@
             font-weight: bold;
             text-decoration: underline;
         }
+        .verification { width: 100%; border-collapse: collapse; margin: 10px 0 12px; }
+        .verification td { border: 1px solid #d1d5db; padding: 8px; vertical-align: middle; }
+        .verification .qr { width: 78px; text-align: center; }
+        .verification img { width: 68px; height: 68px; }
+        .verification p { margin: 2px 0; font-size: 8px; color: #4b5563; }
     </style>
 </head>
 <body>
@@ -192,6 +197,18 @@
             <li>Layanan buka pada hari kerja Senin - Jumat pukul 08.00 - 15.00 WIB di Ruang Tata Usaha.</li>
         </ul>
     </div>
+
+    @if($qrDataUri)
+        <table class="verification">
+            <tr>
+                <td class="qr"><img src="{{ $qrDataUri }}" alt="QR pelacakan"></td>
+                <td>
+                    <strong>Nomor Antrean: {{ $legalisir->nomor_antrean }}</strong>
+                    <p>Pindai QR untuk melihat status layanan. Halaman verifikasi tidak menampilkan nama, kontak, atau nomor dokumen pemohon.</p>
+                </td>
+            </tr>
+        </table>
+    @endif
 
     <!-- TANDA TANGAN -->
     <table class="signatures">

@@ -4,15 +4,19 @@ namespace App\Observers;
 
 use App\Models\AuditLog;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Request;
 
 class AuditObserver
 {
     protected function cleanAttributes(array $attributes): array
     {
         // Jangan simpan data sensitif seperti password dalam log
-        unset($attributes['password'], $attributes['remember_token']);
+        unset(
+            $attributes['password'],
+            $attributes['remember_token'],
+            $attributes['tracking_token_hash'],
+            $attributes['tracking_token_encrypted'],
+        );
+
         return $attributes;
     }
 

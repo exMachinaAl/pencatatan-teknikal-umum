@@ -4,18 +4,24 @@
             <div class="tu-hero-copy">
                 <p class="tu-hero-kicker">Sistem Administrasi Sekolah</p>
                 <h1>Selamat datang, {{ auth()->user()?->name ?? 'Petugas Tata Usaha' }}</h1>
-                <p>Kelola surat, layanan, dan administrasi kepegawaian dari satu ruang kerja yang ringkas.</p>
+                <p>{{ $roleLabel }} · Menu dan data ditampilkan sesuai tanggung jawab Anda.</p>
 
+                @if ($canCreateSuratMasuk || $canCreateSuratKeluar)
                 <div class="tu-hero-actions">
+                    @if ($canCreateSuratMasuk)
                     <a href="{{ \App\Filament\Resources\SuratMasukResource::getUrl('create') }}" class="tu-hero-button tu-hero-button--primary">
                         <x-filament::icon icon="heroicon-m-plus" />
                         Catat surat masuk
                     </a>
+                    @endif
+                    @if ($canCreateSuratKeluar)
                     <a href="{{ \App\Filament\Resources\SuratKeluarResource::getUrl('create') }}" class="tu-hero-button tu-hero-button--secondary">
                         Buat surat keluar
                         <x-filament::icon icon="heroicon-m-arrow-right" />
                     </a>
+                    @endif
                 </div>
+                @endif
             </div>
 
             <div class="tu-hero-date" aria-label="Tanggal hari ini">
@@ -25,6 +31,7 @@
             </div>
         </header>
 
+        @if ($canViewSurat)
         <section class="tu-priority" aria-labelledby="priority-title">
             <div class="tu-section-heading">
                 <div>
@@ -90,7 +97,9 @@
                 </article>
             </div>
         </section>
+        @endif
 
+        @if (count($modules))
         <section class="tu-quick-nav" aria-labelledby="quick-nav-title">
             <div class="tu-section-heading">
                 <div>
@@ -115,7 +124,9 @@
                 @endforeach
             </nav>
         </section>
+        @endif
 
+        @if (count($attention))
         <section class="tu-attention" aria-labelledby="attention-title">
             <div class="tu-section-heading tu-section-heading--compact">
                 <div>
@@ -138,6 +149,7 @@
                 @endforeach
             </div>
         </section>
+        @endif
 
         @if (count($utilities))
             <details class="tu-utilities">

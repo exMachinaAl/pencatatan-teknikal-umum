@@ -28,6 +28,9 @@ class AdminPanelProvider extends PanelProvider
             ->path('admin')
             ->login(Login::class)
             ->brandName('Sistem Informasi Tata Usaha')
+            // Navigasi penuh lebih tahan terhadap kegagalan query daripada SPA:
+            // respons error tidak dapat meninggalkan shell panel dalam keadaan kosong.
+            ->spa(false)
             ->sidebarFullyCollapsibleOnDesktop()
             ->maxContentWidth('7xl')
             ->renderHook('panels::head.end', fn () => view('filament.hooks.vite'))

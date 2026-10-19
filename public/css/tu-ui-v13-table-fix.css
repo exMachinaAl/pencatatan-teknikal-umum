@@ -1,0 +1,119 @@
+/*
+  SISTEM TATA USAHA — UI V1.3 | TABLE LAYOUT HOTFIX
+  Kompatibel: Filament 3 dan CSS tambahan UI V1.2.
+  Fokus: teks panjang pada Keterangan / Nilai Pengaturan, ruang tombol tiga titik,
+  dan overflow tabel responsif. Visual-only: tidak ada kode aplikasi/data berubah.
+*/
+
+/* Jangan biarkan tabel memaksa panel atau halaman lebih lebar dari viewport. */
+.fi-main,
+.fi-page,
+.fi-ta-ctn,
+.fi-ta-content,
+.fi-section,
+.fi-section-content,
+.fi-fo-field-wrp {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Panel tetap berbentuk rounded, tetapi tidak memangkas fokus/menu di luarnya. */
+.fi-ta-ctn {
+    overflow: visible !important;
+}
+
+/* Jika tabel punya banyak kolom, scroll tabelnya saja, bukan seluruh halaman. */
+.fi-ta-content {
+    overflow-x: auto;
+    max-width: 100%;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+.fi-ta-table {
+    width: 100%;
+    max-width: 100%;
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* Teks terpotong/URL/key panjang tidak boleh menggambar di atas kolom sebelah. */
+.fi-ta-table tbody .fi-ta-cell,
+.fi-ta-table tbody td:not(.fi-ta-actions-cell) {
+    min-width: 0;
+    vertical-align: middle;
+}
+.fi-ta-table .fi-ta-text,
+.fi-ta-table .fi-ta-text-item,
+.fi-ta-table .fi-ta-text-item-label,
+.fi-ta-table tbody td:not(.fi-ta-actions-cell) p {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word;
+}
+
+/* Batasi lebar teks: 60 karakter tanpa spasi tidak memperlebar panel. */
+.fi-ta-table tbody td:not(.fi-ta-actions-cell) .fi-ta-text-item,
+.fi-ta-table tbody td:not(.fi-ta-actions-cell) .fi-ta-text-item-label {
+    max-width: min(36ch, 34vw);
+}
+.fi-ta-table tbody td:not(.fi-ta-actions-cell) .fi-ta-text-item-label {
+    display: inline-block;
+    vertical-align: middle;
+}
+.fi-ta-table .fi-ta-header-cell-label {
+    white-space: normal !important;
+    overflow-wrap: anywhere;
+    text-wrap: pretty;
+}
+
+/* Sisakan ruang nyata antara tombol tindakan (...) dan tepi kanan tabel. */
+.fi-ta-table tr > :last-child {
+    padding-right: 1.4rem !important;
+}
+.fi-ta-table tbody td.fi-ta-actions-cell {
+    min-width: 5rem;
+    width: 1%;
+    padding-left: .75rem !important;
+    padding-right: 1.5rem !important;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+.fi-ta-table .fi-ta-actions,
+.fi-ta-table .fi-ta-actions > div {
+    min-width: max-content;
+    gap: .35rem;
+}
+.fi-ta-table .fi-ta-actions :is(.fi-icon-btn, button) {
+    flex-shrink: 0;
+}
+
+/* Dropdown yang lebar dibatasi viewport, tanpa memangkas label informasinya. */
+.fi-dropdown-panel {
+    max-width: min(26rem, calc(100vw - 1.5rem));
+    overflow-wrap: anywhere;
+}
+
+/* Keterangan atau isi text panjang di form dan modal tetap dalam panel. */
+.fi-section :is(.fi-section-description, .fi-fo-field-wrp-helper-text, .fi-fo-field-wrp-hint),
+.fi-modal-window :is(p, .fi-fo-field-wrp-helper-text) {
+    min-width: 0;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 767px) {
+    .fi-ta-table tbody td:not(.fi-ta-actions-cell) .fi-ta-text-item,
+    .fi-ta-table tbody td:not(.fi-ta-actions-cell) .fi-ta-text-item-label {
+        max-width: 13rem;
+    }
+    .fi-ta-table tbody td.fi-ta-actions-cell {
+        min-width: 4.25rem;
+        padding-right: 1.125rem !important;
+    }
+    .fi-ta-table tr > :last-child {
+        padding-right: 1.125rem !important;
+    }
+}

@@ -6,11 +6,11 @@ export default defineConfig({
         laravel({
             input: ['resources/css/app.css', 'resources/js/app.js'],
             refresh: [
-                'app/Filament/**',
-                'app/Livewire/**',
-                'app/Providers/Filament/**',
-                'resources/views/**',
-                'routes/**',
+                'app/**/*.php',
+                'config/**/*.php',
+                'database/**/*.php',
+                'resources/views/**/*.blade.php',
+                'routes/**/*.php',
             ],
         }),
     ],

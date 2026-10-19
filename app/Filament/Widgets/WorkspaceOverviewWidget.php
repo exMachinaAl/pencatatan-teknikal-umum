@@ -13,6 +13,7 @@ use App\Filament\Resources\PegawaiResource;
 use App\Filament\Resources\SuratKeluarResource;
 use App\Filament\Resources\SuratMasukResource;
 use App\Filament\Resources\UserResource;
+use App\Models\Disposisi;
 use App\Models\GajiBerkala;
 use App\Models\Legalisir;
 use App\Models\Pegawai;
@@ -26,62 +27,78 @@ class WorkspaceOverviewWidget extends Widget
 
     protected static bool $isLazy = false;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     protected function getViewData(): array
     {
-        $suratMasuk = SuratMasuk::query()
+        $user = auth()->user();
+        $canViewSurat = $user?->canPerform('surat', 'view') ?? false;
+        $canViewLegalisir = $user?->canPerform('legalisir', 'view') ?? false;
+        $canViewKepegawaian = $user?->canPerform('kepegawaian', 'view') ?? false;
+
+        $suratMasuk = $canViewSurat ? SuratMasuk::query()
             ->whereIn('status', ['baru', 'didisposisi'])
             ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_diterima')
             ->latest('id')
-            ->first();
+            ->first() : null;
 
-        $suratKeluar = SuratKeluar::query()
+        $suratKeluar = $canViewSurat ? SuratKeluar::query()
             ->where('status', 'draf')
             ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_surat')
             ->latest('id')
-            ->first();
+            ->first() : null;
 
-        $modules = [
+        $moduleDefinitions = [
             [
                 'label' => 'Surat Masuk',
                 'description' => 'Agenda dan disposisi',
                 'icon' => 'heroicon-o-inbox-arrow-down',
-                'url' => SuratMasukResource::getUrl(),
+                'resource' => SuratMasukResource::class,
             ],
             [
                 'label' => 'Surat Keluar',
                 'description' => 'Konsep dan arsip',
                 'icon' => 'heroicon-o-paper-airplane',
-                'url' => SuratKeluarResource::getUrl(),
+                'resource' => SuratKeluarResource::class,
             ],
             [
                 'label' => 'Pegawai',
                 'description' => 'Data kepegawaian',
                 'icon' => 'heroicon-o-users',
-                'url' => PegawaiResource::getUrl(),
+                'resource' => PegawaiResource::class,
             ],
             [
                 'label' => 'Kenaikan Pangkat',
                 'description' => 'Usulan dan status',
                 'icon' => 'heroicon-o-arrow-trending-up',
-                'url' => KenaikanPangkatResource::getUrl(),
+                'resource' => KenaikanPangkatResource::class,
             ],
             [
                 'label' => 'Gaji Berkala',
                 'description' => 'Jadwal KGB',
                 'icon' => 'heroicon-o-banknotes',
-                'url' => GajiBerkalaResource::getUrl(),
+                'resource' => GajiBerkalaResource::class,
             ],
             [
                 'label' => 'Legalisir',
                 'description' => 'Permohonan layanan',
                 'icon' => 'heroicon-o-document-check',
-                'url' => LegalisirResource::getUrl(),
+                'resource' => LegalisirResource::class,
             ],
         ];
+
+        $modules = collect($moduleDefinitions)
+            ->filter(fn (array $module): bool => $module['resource']::canViewAny())
+            ->map(function (array $module): array {
+                $module['url'] = $module['resource']::getUrl();
+                unset($module['resource']);
+
+                return $module;
+            })
+            ->values()
+            ->all();
 
         $utilities = [];
 
@@ -97,8 +114,10 @@ class WorkspaceOverviewWidget extends Widget
             }
         }
 
-        $attention = [
-            [
+        $attention = [];
+
+        if ($canViewLegalisir) {
+            $attention[] = [
                 'label' => 'Legalisir menunggu proses',
                 'count' => Legalisir::perluTindakLanjut()->count(),
                 'detail' => 'permohonan perlu diverifikasi',
@@ -106,8 +125,24 @@ class WorkspaceOverviewWidget extends Widget
                     'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
                 ]),
                 'tone' => 'amber',
-            ],
-            [
+            ];
+        }
+
+        if ($canViewSurat) {
+            $overdueDispositions = Disposisi::terlambat()->count();
+            if ($overdueDispositions > 0) {
+                $attention[] = [
+                    'label' => 'Disposisi melewati tenggat',
+                    'count' => $overdueDispositions,
+                    'detail' => 'tindak lanjut surat perlu perhatian',
+                    'url' => SuratMasukResource::getUrl('index'),
+                    'tone' => 'rose',
+                ];
+            }
+        }
+
+        if ($canViewKepegawaian) {
+            $attention[] = [
                 'label' => 'KGB mendekati jatuh tempo',
                 'count' => GajiBerkala::perluTindakLanjut()->count(),
                 'detail' => 'belum diserahkan; satu bulan lalu sampai tiga bulan ke depan',
@@ -115,8 +150,8 @@ class WorkspaceOverviewWidget extends Widget
                     'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
                 ]),
                 'tone' => 'rose',
-            ],
-            [
+            ];
+            $attention[] = [
                 'label' => 'Calon kenaikan pangkat',
                 'count' => Pegawai::active()->calonKp()->count(),
                 'detail' => 'pegawai masuk periode persiapan',
@@ -127,9 +162,19 @@ class WorkspaceOverviewWidget extends Widget
                     ],
                 ]),
                 'tone' => 'emerald',
-            ],
-        ];
+            ];
+        }
 
-        return compact('suratMasuk', 'suratKeluar', 'modules', 'utilities', 'attention');
+        return [
+            'suratMasuk' => $suratMasuk,
+            'suratKeluar' => $suratKeluar,
+            'modules' => $modules,
+            'utilities' => $utilities,
+            'attention' => $attention,
+            'canViewSurat' => $canViewSurat,
+            'canCreateSuratMasuk' => SuratMasukResource::canCreate(),
+            'canCreateSuratKeluar' => SuratKeluarResource::canCreate(),
+            'roleLabel' => $user?->roleLabel() ?? 'Pengguna',
+        ];
     }
 }

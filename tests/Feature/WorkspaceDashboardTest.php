@@ -29,7 +29,7 @@ class WorkspaceDashboardTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->actingAs(User::create([
             'name' => 'Operator', 'email' => 'operator@test.com',
-            'password' => 'password', 'role' => 'admin', 'is_active' => true,
+            'password' => 'password', 'role' => User::ROLE_KEPALA_TU, 'is_active' => true,
         ]));
         $this->travelTo(now()->setDate(2026, 10, 15)->setTime(12, 0));
     }
@@ -81,16 +81,16 @@ class WorkspaceDashboardTest extends TestCase
         $future = Pegawai::create(['nama' => 'Belum masuk periode', 'tmt_pangkat_terakhir' => '2026-01-01']);
 
         // Kedua batas tanggal termasuk, terlepas dari jam saat query dijalankan.
-        $kgb = collect(['2026-09-15', '2027-01-15'])->map(fn ($date) => GajiBerkala::create([
-            'pegawai_id' => $pegawai->id, 'tmt' => '2024-01-01',
+        $kgb = collect(['2026-09-15', '2027-01-15'])->values()->map(fn ($date, $index) => GajiBerkala::create([
+            'pegawai_id' => $pegawai->id, 'tmt' => '2024-0'.($index + 1).'-01',
             'tmt_berikutnya' => $date, 'status' => 'diproses',
         ]));
         $delivered = GajiBerkala::create([
-            'pegawai_id' => $pegawai->id, 'tmt' => '2024-01-01',
+            'pegawai_id' => $pegawai->id, 'tmt' => '2024-03-01',
             'tmt_berikutnya' => '2026-10-15', 'status' => 'diserahkan',
         ]);
         $outside = GajiBerkala::create([
-            'pegawai_id' => $pegawai->id, 'tmt' => '2024-01-01',
+            'pegawai_id' => $pegawai->id, 'tmt' => '2024-04-01',
             'tmt_berikutnya' => '2027-01-16', 'status' => 'diproses',
         ]);
 
@@ -121,11 +121,12 @@ class WorkspaceDashboardTest extends TestCase
 
     public function test_utilitas_admin_tidak_ditawarkan_ke_staf(): void
     {
+        auth()->user()->update(['role' => User::ROLE_ADMIN]);
         $adminUrls = [UserResource::getUrl(), BackupManager::getUrl()];
         Livewire::test(WorkspaceOverviewWidget::class)
             ->assertViewHas('utilities', fn ($items) => count(array_intersect($adminUrls, array_column($items, 'url'))) === 2);
 
-        auth()->user()->update(['role' => 'staf']);
+        auth()->user()->update(['role' => User::ROLE_PETUGAS_TU]);
         Livewire::test(WorkspaceOverviewWidget::class)
             ->assertViewHas('utilities', fn ($items) => count(array_intersect($adminUrls, array_column($items, 'url'))) === 0);
     }

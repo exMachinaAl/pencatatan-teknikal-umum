@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\AppSettingResource\Pages;
 use App\Models\AppSetting;
 use Filament\Forms;
@@ -9,10 +10,11 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class AppSettingResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = AppSetting::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
@@ -25,9 +27,9 @@ class AppSettingResource extends Resource
 
     protected static ?int $navigationSort = 5;
 
-    public static function canViewAny(): bool
+    protected static function accessModule(): string
     {
-        return in_array(Auth::user()?->role, ['admin', 'kepala']);
+        return 'settings';
     }
 
     public static function form(Form $form): Form

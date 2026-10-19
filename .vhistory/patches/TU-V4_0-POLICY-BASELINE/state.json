@@ -1,0 +1,20 @@
+{
+    "patch_id": "TU-V4_0-POLICY-BASELINE",
+    "status": "applied",
+    "installed_at": "2026-10-19T09:57:01+00:00",
+    "files": {
+        "resources/views/filament/pages/tu-security-overview.blade.php": "e29458c59297d2036b876fd0cce4f32204f3281ada775c9ebd0b4522056e8f6c",
+        "app/Support/TuAccess.php": "b5c4ef80e1ee5a2a573f792786a1cd3672c04948e130077cb5c8bd7756226a11",
+        "app/Policies/KenaikanPangkatPolicy.php": "9178cdc9715811c2db0deaf70c678376c8bc53efcfc01d79bb717a145bc95b2c",
+        "app/Policies/SuratMasukPolicy.php": "277718c0888c6519c42dbbc526cd5f72a6a81ed6150dd56c6c2d3d9b0cf5e091",
+        "app/Policies/LegalisirPolicy.php": "289ab6d79aab6ce0e9b139a0ca6bf5010ffb714c7072c9b1eb916e81f44d5f0c",
+        "app/Policies/AuditLogPolicy.php": "11a1916091e55b963d1b5954808911dfb478e95525f20beb295f874da84bbafe",
+        "app/Policies/GajiBerkalaPolicy.php": "4d7a59c1a2015afeb8cb93f1da5827d97ba383df521bd24227720d8862bd0e92",
+        "app/Policies/TuBasePolicy.php": "a55882055fbeeafd1c112afdb558f9581cc358c488d9b09f4b7451801987d925",
+        "app/Policies/PegawaiPolicy.php": "0ae6c1e960e78f4ddf57ef125509d4447581e26f6e2cb15ab53c57a4fd9ee579",
+        "app/Policies/SuratKeluarPolicy.php": "59adb0016e11dbe3f7bc7105521ab113e14d5948a6f1358b14cea76cf4a7c639",
+        "app/Policies/AppSettingPolicy.php": "86c76fb1a1ecccf9eadc2df7986091105218c961ece55472244987513557aadf",
+        "app/Policies/UserPolicy.php": "cda773e68510dfe5859885cf4b1f5ba6e0ae0fc13394a124eb0fe8da87a4003a",
+        "app/Filament/Pages/TuSecurityOverview.php": "8029297c66ee2bb099ee4f3904a0f97a8f921372c42b0b983a10b8bce6bf5b9c"
+    }
+}

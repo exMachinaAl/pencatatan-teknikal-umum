@@ -7,7 +7,8 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 ## 🌟 Modul & Fitur Utama
 
 ### 1. Data Pegawai & Kepegawaian
-* Pencatatan data lengkap Guru dan Tenaga Kependidikan: NIP, Nama, Status Kepegawaian (PNS, PPPK, Honorer), Jabatan, Golongan/Ruang, dan TMT terakhir.
+* Pencatatan data lengkap Guru dan Tenaga Kependidikan: NIP, nama, foto profil privat, kontak, biodata, unit kerja, pendidikan terakhir, status kepegawaian, jabatan, golongan/ruang, dan TMT terakhir.
+* Akun pengurus dapat memuat foto privat, nomor kontak, jabatan organisasi, unit/divisi, serta dihubungkan ke satu data pegawai.
 * **Kalkulator Otomatis Calon Kenaikan Pangkat (KP)**: Deteksi otomatis pegawai yang telah mencapai interval 4 tahun dari TMT pangkat terakhir.
 * **Kalkulator Otomatis Jatuh Tempo KGB**: Deteksi otomatis pegawai yang mendekati jatuh tempo Kenaikan Gaji Berkala (2 tahun dari TMT KGB terakhir).
 * Filter pintar: Filter status kepegawaian, golongan, status aktif, filter cepat "Calon KP" dan "Jatuh Tempo KGB".
@@ -21,18 +22,19 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 
 ### 3. Kenaikan Gaji Berkala (KGB)
 * Riwayat KGB per pegawai dengan penghitungan otomatis TMT KGB berikutnya (+2 tahun) yang tetap dapat disesuaikan manual.
-* **Perlindungan Privasi Data Gaji (UU PDP No. 27 Tahun 2022)**: Data nominal gaji pokok hanya dapat diakses oleh peran **Admin (Operator TU)** dan **Kepala Sekolah / Kepala TU**. Bagi staf operasional biasa, kolom gaji disamarkan (`••••••••`).
+* **Perlindungan Privasi Data Gaji (UU PDP No. 27 Tahun 2022)**: Data nominal gaji pokok hanya dapat diakses oleh **Kepala TU** dan **Petugas Kepegawaian**. Bagi role lain yang boleh membaca modul kepegawaian, nominal disamarkan (`••••••••`).
 * Dashboard peringatan jatuh tempo KGB dalam 3 bulan ke depan.
 
 ### 4. Surat Masuk & Disposisi
 * **Penomoran Agenda Otomatis**: Format `SM/{Tahun}/{NomorUrut}` terurut per tahun anggaran secara otomatis.
 * Lembar **Disposisi Pimpinan Digital**: Pencatatan arahan/instruksi Kepala Sekolah/Kepala TU, batas waktu, dan catatan tindak lanjut.
 * Pengarsipan ganda: Pencatatan lokasi fisik lemari/ordner/boks arsip dan unggahan softfile scan dokumen (PDF/JPG/PNG, proteksi disk privat, maksimal 5 MB).
+* Preview PDF atau gambar tersedia dari detail record tanpa menjadikan file publik; izin pengguna tetap diperiksa dan akses dicatat.
 * Filter lengkap: Rentang tanggal diterima, pengirim, klasifikasi surat, sifat surat (Biasa, Penting, Segera, Rahasia), dan status arsip.
 
 ### 5. Surat Keluar & Kearsipan
-* **Penomoran Surat Thread-Safe**: Dihasilkan otomatis di dalam transaksi database berkunci atomik `(tahun, nomor_urut)` untuk mencegah nomor ganda/lompat.
-* Format penomoran fleksibel dan dapat dikonfigurasi melalui menu pengaturan (contoh standar: `421/{nomor_urut}/SMAN1/{tahun}`).
+* **Nomor Surat Resmi**: Nomor surat keluar diisi manual mengikuti nomor yang telah ditetapkan sekolah dan diperiksa unik oleh sistem.
+* Nomor agenda surat masuk tetap dibuat otomatis sebagai identitas internal TU, terpisah dari nomor surat instansi asal.
 * Pencatatan pembuat konsep, penandatangan, tujuan surat, sifat, dan softfile final bertanda tangan.
 
 ### 6. Layanan Legalisir Dokumen
@@ -40,6 +42,7 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 * Penomoran registrasi legalisir otomatis: `LEG/{Tahun}/{NomorUrut}`.
 * Alur status: `Diterima` ➔ `Diproses / Diverifikasi` ➔ `Siap Diambil` ➔ `Sudah Diambil`.
 * **Cetak Bukti Tanda Terima (PDF)**: Tombol cetak tanda terima instan ber-KOP resmi sekolah, lengkap dengan nomor registrasi, data pemohon, dan ketentuan pengambilan berkas.
+* Dokumen legalisir yang berupa PDF atau gambar dapat dipreview secara privat oleh pengguna yang berwenang.
 
 ### 7. Impor Respons Google Form (CSV)
 * Jalur masuk fleksibel untuk data permohonan legalisir online atau surat dari instansi luar yang dihimpun melalui Google Form / Google Sheets.
@@ -56,20 +59,23 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 
 ### 9. Pencadangan & Pemulihan Database (Backup & Restore)
 * Perintah terjadwal via CLI: `php artisan app:backup-database`.
-* Menu antarmuka visual (1-Click Backup) di Panel Admin untuk mengunduh berkas dump SQL terenkripsi secara langsung.
+* Menu antarmuka visual (1-Click Backup) di Panel Admin untuk membuat dan mengunduh dump SQL dari penyimpanan privat. Enkripsi dan verifikasi checksum dijadwalkan pada fase V4.5.
 
 ---
 
-## 👥 Akun Bawaan (Default Credentials)
+## 👥 Akun Bawaan Lokal (Default Credentials)
 
-Sistem telah dilengkapi dengan data seeder awal dan 4 tingkat peran:
+Seeder membuat lima akun lokal berikut. Administrator Sistem berada di Divisi IT sebagai fasilitator teknis dan bukan atasan operasional TU. Kepala TU adalah pimpinan tertinggi di lingkungan TU. Dua role tambahan (`kepegawaian` dan `auditor`) dapat diberikan Administrator Sistem kepada pengguna nyata melalui menu Kelola Pengguna.
+
+> Password awal dibaca dari variabel `TU_*_INITIAL_PASSWORD` di `.env`. Seeder tidak akan menimpa password, role, atau status akun yang sudah ada.
 
 | Peran (Role) | Email Login | Kata Sandi | Hak Akses Utama |
 |---|---|---|---|
-| **Admin (Operator TU)** | `admin@tu.sekolah.sch.id` | `password` | Akses penuh CRUD seluruh modul, kelola akun pengguna, backup database, impor Google Form, ekspor data, konfigurasi format nomor surat. |
-| **Kepala Sekolah / Kepala TU** | `kepala@tu.sekolah.sch.id` | `password` | Hak verifikasi surat & disposisi, monitoring legalisir, melihat data gaji pegawai, melihat audit log. |
-| **Staf Tata Usaha** | `staf@tu.sekolah.sch.id` | `password` | Operasional harian surat masuk/keluar, legalisir, pengajuan KP dan KGB (data nominal gaji disamarkan). |
-| **Pegawai / Guru** | `pegawai@tu.sekolah.sch.id` | `password` | Portal melihat data kepegawaian pribadi. |
+| **Administrator Sistem / Fasilitator TI** | `admin@tu.sekolah.sch.id` | `.env` | Divisi IT: kelola pengguna, pengaturan, backup, audit teknis, dan pemantauan baca-saja. Bukan pelaksana atau pimpinan TU. |
+| **Kepala Tata Usaha** | `kepala.tu@tu.sekolah.sch.id` | `.env` | Pimpinan operasional tertinggi TU dengan akses seluruh modul kerja TU dan audit. |
+| **Kepala Sekolah** | `kepala@tu.sekolah.sch.id` | `.env` | Baca modul operasional dan cetak bukti legalisir; tidak mengubah record langsung. |
+| **Petugas TU** | `staf@tu.sekolah.sch.id` | `.env` | Operasional surat masuk/keluar dan legalisir, termasuk impor/ekspor yang diizinkan. |
+| **Pegawai / Guru** | `pegawai@tu.sekolah.sch.id` | `.env` | Akses panel dasar; portal record pribadi belum dibuka sampai relasi kepemilikan data tersedia. |
 
 ---
 
@@ -114,13 +120,13 @@ Vite akan memuat ulang halaman ketika file Blade/PHP berubah dan menerapkan peru
 
 ## 🧪 Menjalankan Pengujian Otomatis (Unit & Feature Tests)
 
-Aplikasi telah dilengkapi unit & feature test untuk memastikan penomoran surat, kalkulasi jatuh tempo, dan pembatasan hak akses gaji berjalan 100% aman:
+Aplikasi dilengkapi unit dan feature test untuk memeriksa penomoran surat, kalkulasi jatuh tempo, impor, serta pembatasan hak akses:
 
 ```powershell
 php artisan test
 ```
 
-Semua pengujian (`HakAksesTest`, `JatuhTempoTest`, `SuratTest`, `ExampleTest`) dinyatakan lulus (*8 passed, 22 assertions*).
+Jumlah test terus bertambah mengikuti fase pengembangan. Gunakan hasil perintah terbaru sebagai sumber status, bukan angka statis pada dokumentasi.
 
 ---
 
@@ -136,7 +142,7 @@ mysql -u root -p tata_usaha_db < storage/app/backups/backup-tata_usaha_db-YYYY-M
 
 ## 📋 Catatan Risiko & Validasi Lanjutan dengan Pihak TU Sekolah
 
-1. **Format Nomor Surat Dinas**: Format default saat ini adalah `421/{nomor_urut}/SMAN1/{tahun}`. Jika pihak sekolah memiliki kode sub-unit atau tata naskah dinas daerah khusus, format dapat disesuaikan langsung di menu **Pengaturan Aplikasi** tanpa perlu mengubah kode sumber.
+1. **Nomor Surat Dinas**: Nomor surat keluar diisi manual sesuai nomor resmi yang telah ditetapkan sekolah. Sistem memeriksa keunikannya dan tidak membuat nomor baru atas nama sekolah.
 2. **Keterhubungan Google Form**: Jalur impor CSV saat ini telah dilengkapi pencegahan data ganda. Bila volume pengiriman surat eksternal atau legalisir alumni sangat tinggi di masa mendatang, dapat dihubungkan webhook Google Apps Script langsung ke endpoint API internal.
 3. **Penyimpanan Berkas Digital**: Berkas pindaian surat dan ijazah disimpan pada disk privat `storage/app/` demi menjaga kerahasiaan dokumen dinas sekolah sesuai UU Perlindungan Data Pribadi (UU PDP).
 # pencatatan-teknikal-umum

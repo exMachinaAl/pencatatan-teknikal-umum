@@ -5,7 +5,6 @@ namespace App\Filament\Pages;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Artisan;
-use Illuminate\Support\Facades\Auth;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class BackupManager extends Page
@@ -24,11 +23,13 @@ class BackupManager extends Page
 
     public static function canAccess(): bool
     {
-        return Auth::user()?->isAdmin() ?? false;
+        return auth()->user()?->canPerform('backup', 'view') ?? false;
     }
 
     public function createBackup(): void
     {
+        abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
+
         try {
             Artisan::call('app:backup-database');
             Notification::make()
@@ -45,22 +46,41 @@ class BackupManager extends Page
 
     public function downloadBackup(string $filename): ?BinaryFileResponse
     {
-        $filePath = storage_path("app/backups/{$filename}");
-        if (! file_exists($filePath)) {
-            Notification::make()->title('Berkas backup tidak ditemukan.')->danger()->send();
-            return null;
-        }
+        abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
+
+        $filePath = $this->resolveBackupPath($filename);
 
         return response()->download($filePath);
     }
 
     public function deleteBackup(string $filename): void
     {
-        $filePath = storage_path("app/backups/{$filename}");
-        if (file_exists($filePath)) {
-            unlink($filePath);
-            Notification::make()->title('Berkas backup telah dihapus.')->success()->send();
+        abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
+
+        $filePath = $this->resolveBackupPath($filename);
+        unlink($filePath);
+        Notification::make()->title('Berkas backup telah dihapus.')->success()->send();
+    }
+
+    private function resolveBackupPath(string $filename): string
+    {
+        if (
+            $filename !== basename($filename) ||
+            str_contains($filename, '/') ||
+            str_contains($filename, '\\') ||
+            ! preg_match('/\Abackup-[A-Za-z0-9._-]+\.sql\z/D', $filename)
+        ) {
+            abort(404);
         }
+
+        $backupRoot = realpath(storage_path('app/backups'));
+        $filePath = $backupRoot ? realpath($backupRoot.DIRECTORY_SEPARATOR.$filename) : false;
+
+        if (! $backupRoot || ! $filePath || ! is_file($filePath) || dirname($filePath) !== $backupRoot) {
+            abort(404);
+        }
+
+        return $filePath;
     }
 
     public function getBackupFilesProperty(): array

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\KenaikanPangkatResource\Pages;
 use App\Models\KenaikanPangkat;
 use App\Models\Pegawai;
@@ -14,10 +15,13 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
 class KenaikanPangkatResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = KenaikanPangkat::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-trending-up';
@@ -29,6 +33,11 @@ class KenaikanPangkatResource extends Resource
     protected static ?string $pluralModelLabel = 'Kenaikan Pangkat (KP)';
 
     protected static ?int $navigationSort = 2;
+
+    protected static function accessModule(): string
+    {
+        return 'kepegawaian';
+    }
 
     public static function form(Form $form): Form
     {
@@ -76,11 +85,14 @@ class KenaikanPangkatResource extends Resource
 
                         Forms\Components\TextInput::make('periode')
                             ->label('Periode Pengajuan')
-                            ->placeholder('Contoh: 2026-04 atau Periode April 2026')
+                            ->placeholder('Contoh: 2026-04')
+                            ->regex('/^\d{4}-(0[1-9]|1[0-2])$/')
+                            ->maxLength(7)
                             ->default(fn () => date('Y-m')),
 
                         Forms\Components\DatePicker::make('tmt')
                             ->label('TMT Kenaikan Pangkat')
+                            ->required()
                             ->displayFormat('d/m/Y'),
                     ])->columns(2),
 
@@ -96,7 +108,8 @@ class KenaikanPangkatResource extends Resource
 
                         Forms\Components\TextInput::make('nomor_sk')
                             ->label('Nomor SK Kenaikan Pangkat')
-                            ->placeholder('Diisi jika SK sudah terbit'),
+                            ->placeholder('Diisi jika SK sudah terbit')
+                            ->maxLength(100),
 
                         Forms\Components\DatePicker::make('tanggal_sk')
                             ->label('Tanggal SK')
@@ -104,12 +117,14 @@ class KenaikanPangkatResource extends Resource
 
                         Forms\Components\TextInput::make('pejabat_penetap')
                             ->label('Pejabat Penetap')
-                            ->placeholder('Contoh: Gubernur, Kepala BKD, Kepala Disdik'),
+                            ->placeholder('Contoh: Gubernur, Kepala BKD, Kepala Disdik')
+                            ->maxLength(150),
 
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan / Checklist Kelengkapan Berkas')
                             ->placeholder('Contoh: SKP 2 tahun terakhir lengkap, PAK sudah diverifikasi...')
                             ->rows(3)
+                            ->maxLength(20000)
                             ->columnSpanFull(),
                     ])->columns(2),
             ]);
@@ -203,6 +218,8 @@ class KenaikanPangkatResource extends Resource
                     Tables\Actions\Action::make('update_status')
                         ->label('Ubah Status')
                         ->icon('heroicon-o-arrow-path')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (KenaikanPangkat $record): bool => $record->status !== 'diserahkan')
                         ->form([
                             Forms\Components\Select::make('status')
                                 ->label('Status Baru')
@@ -214,15 +231,13 @@ class KenaikanPangkatResource extends Resource
                                 ->label('Tanggal SK'),
                         ])
                         ->action(function (KenaikanPangkat $record, array $data) {
-                            $record->update(array_filter($data));
-                            // Jika SK terbit/diserahkan, otomatis update golongan pegawai!
-                            if (in_array($data['status'], ['sk_terbit', 'diserahkan']) && $record->golongan_baru_id) {
-                                $record->pegawai->update([
-                                    'golongan_id' => $record->golongan_baru_id,
-                                    'tmt_pangkat_terakhir' => $record->tmt ?: now(),
-                                ]);
-                            }
-                        }),
+                            static::authorizeResourceAction('transition');
+                            DB::transaction(function () use ($record, $data): void {
+                                Pegawai::whereKey($record->pegawai_id)->lockForUpdate()->firstOrFail();
+                                $record->update(array_filter($data, fn ($value) => $value !== null && $value !== ''));
+                            });
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -232,7 +247,9 @@ class KenaikanPangkatResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="kenaikan-pangkat-' . date('Ymd-His') . '.csv"',

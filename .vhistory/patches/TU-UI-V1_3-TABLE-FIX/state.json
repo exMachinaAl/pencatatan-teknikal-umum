@@ -1,0 +1,15 @@
+{
+    "patch_id": "TU-UI-V1_3-TABLE-FIX",
+    "status": "applied",
+    "applied_at": "2026-10-19T03:02:57+00:00",
+    "old_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "51e58e7b319d93d5b553cb9e1ff2e5f4c76f20e9128d9040c299eca7f2ba5a9c",
+        "public/css/tu-ui-v13-table-fix.css": null
+    },
+    "new_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "14eb5cec5840726aaa803506e9758cde466d4563b04b47cdc52921b2b1eca771",
+        "public/css/tu-ui-v13-table-fix.css": "3ad985dc5dd9c1aabfbbb0e5adfe43986b6d430ebab55b6cc7898e8d6e544655"
+    },
+    "css_old_exists": false,
+    "backup_dir": ".trash/TU-UI-V1_3-TABLE-FIX"
+}

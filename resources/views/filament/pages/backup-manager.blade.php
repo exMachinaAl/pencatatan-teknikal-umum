@@ -5,10 +5,10 @@
             <div>
                 <h3 class="text-xl font-bold flex items-center gap-2">
                     <x-filament::icon icon="heroicon-o-shield-check" class="w-6 h-6" />
-                    Pencadangan Database Terenkripsi & Terjadwal
+                    Pencadangan Database Privat & Terjadwal
                 </h3>
                 <p class="text-emerald-100 text-sm mt-1 max-w-2xl">
-                    Amankan seluruh data kepegawaian, surat dinas, arsip, dan riwayat legalisir sekolah dengan sekali klik. Berkas SQL disimpan di disk privat server.
+                    Cadangkan data kepegawaian, surat dinas, arsip, dan riwayat legalisir sekolah dengan sekali klik. Berkas SQL disimpan di folder privat server; enkripsi backup akan diselesaikan pada fase V4.5.
                 </p>
             </div>
             <x-filament::button color="white" wire:click="createBackup" icon="heroicon-o-plus-circle" class="shadow-lg text-emerald-800 hover:bg-emerald-50">

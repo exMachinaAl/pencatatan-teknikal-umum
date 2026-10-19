@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\SuratMasukResource\Pages;
 use App\Models\Disposisi;
 use App\Models\RefKlasifikasiSurat;
@@ -12,12 +13,12 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
 
 class SuratMasukResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = SuratMasuk::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-inbox-arrow-down';
@@ -30,6 +31,11 @@ class SuratMasukResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static function accessModule(): string
+    {
+        return 'surat';
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -38,9 +44,10 @@ class SuratMasukResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('nomor_agenda')
                             ->label('Nomor Agenda')
-                            ->default(fn () => SuratMasuk::generateNomorAgenda())
-                            ->required()
-                            ->unique(ignoreRecord: true),
+                            ->helperText('Dihasilkan otomatis ketika data disimpan dan tidak dapat diubah.')
+                            ->placeholder('Otomatis saat disimpan')
+                            ->disabled()
+                            ->dehydrated(false),
 
                         Forms\Components\DatePicker::make('tanggal_diterima')
                             ->label('Tanggal Diterima TU')
@@ -127,6 +134,18 @@ class SuratMasukResource extends Resource
                                     ->placeholder('Contoh: Wakasek Kurikulum, Guru Pembina OSIS')
                                     ->required(),
 
+                                Forms\Components\Select::make('penanggung_jawab_id')
+                                    ->label('Penanggung Jawab Akun')
+                                    ->relationship('penanggungJawab', 'name')
+                                    ->searchable()
+                                    ->preload(),
+
+                                Forms\Components\Select::make('prioritas')
+                                    ->label('Prioritas')
+                                    ->options(['normal' => 'Normal', 'penting' => 'Penting', 'mendesak' => 'Mendesak'])
+                                    ->default('normal')
+                                    ->required(),
+
                                 Forms\Components\DatePicker::make('batas_waktu')
                                     ->label('Batas Waktu Selesai')
                                     ->displayFormat('d/m/Y'),
@@ -141,6 +160,10 @@ class SuratMasukResource extends Resource
                                     ->label('Status Tindak Lanjut')
                                     ->options(Disposisi::STATUSES)
                                     ->default('terbuka'),
+
+                                Forms\Components\DateTimePicker::make('selesai_pada')
+                                    ->label('Diselesaikan Pada')
+                                    ->seconds(false),
 
                                 Forms\Components\Textarea::make('catatan_tindak_lanjut')
                                     ->label('Hasil / Laporan Tindak Lanjut')
@@ -158,18 +181,19 @@ class SuratMasukResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nomor_agenda')
-                    ->label('No. Agenda')
-                    ->searchable()
+                Tables\Columns\TextColumn::make('nomor_surat')
+                    ->label('No. Surat Asal')
+                    ->placeholder('Tanpa nomor')
+                    ->searchable(['nomor_surat', 'nomor_agenda'])
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->description(fn (SuratMasuk $record) => "Agenda: {$record->nomor_agenda}"),
 
                 Tables\Columns\TextColumn::make('perihal')
                     ->label('Perihal')
                     ->searchable()
                     ->limit(48)
-                    ->wrap()
-                    ->description(fn (SuratMasuk $record) => $record->nomor_surat ? "No. surat: {$record->nomor_surat}" : null),
+                    ->wrap(),
 
                 Tables\Columns\TextColumn::make('pengirim')
                     ->label('Pengirim')
@@ -250,6 +274,8 @@ class SuratMasukResource extends Resource
                         ->label('Tandai Diarsipkan')
                         ->icon('heroicon-o-archive-box')
                         ->color('gray')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (SuratMasuk $record): bool => $record->status !== 'diarsipkan')
                         ->form([
                             Forms\Components\TextInput::make('lokasi_arsip_fisik')
                                 ->label('Lokasi Fisik Arsip')
@@ -257,12 +283,14 @@ class SuratMasukResource extends Resource
                                 ->required(),
                         ])
                         ->action(function (SuratMasuk $record, array $data) {
+                            static::authorizeResourceAction('transition');
                             $record->update([
                                 'status' => 'diarsipkan',
                                 'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
                                 'diarsipkan_pada' => now(),
                             ]);
-                        }),
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -272,10 +300,12 @@ class SuratMasukResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="surat-masuk-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="surat-masuk-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records) {

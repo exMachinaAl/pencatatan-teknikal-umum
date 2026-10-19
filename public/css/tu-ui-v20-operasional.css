@@ -1,0 +1,350 @@
+/*
+ TU SISTEM TATA USAHA - UI V2.0 / OPERATIONAL POLISH
+ Dependency: Filament 3, TU UI V1.2. Optional: UI V1.3 hotfix.
+ Scope: header, table toolbar, filters, form, actions, pagination, mobile/keyboard/dark mode.
+ No changing PHP, forms, table data, routes, permissions, or feature behavior.
+*/
+:root {
+    --tu20-border: #dce7ec;
+    --tu20-muted: #526d7d;
+    --tu20-focus: #138d92;
+    --tu20-radius: 12px;
+    --tu20-soft: #f5fafb;
+}
+/* Long page titles, section descriptions, and header action buttons */
+.fi-main, .fi-page, .fi-header, .fi-header-heading, .fi-section, .fi-ta-ctn { min-width:0; }
+.fi-header { gap: 1rem; align-items: flex-start; }
+.fi-header > *, .fi-header > div { min-width: 0; }
+.fi-header-heading, .fi-header-subheading, .fi-section-header-heading, .fi-section-header-description {
+    overflow-wrap: anywhere;
+    line-height: 1.32;
+}
+.fi-header-actions, .fi-header .fi-ac, .fi-ta-header .fi-ac {
+    gap: .55rem;
+    flex-wrap: wrap;
+}
+.fi-header-actions :is(a, button) { min-height: 2.4rem; }
+/* Table toolbar: search stays flexible, actions never become cramped */
+.fi-ta-header-toolbar, .fi-ta-header, .fi-ta-header-ctn { min-width:0; }
+.fi-ta-header-toolbar {
+    gap: .75rem;
+    padding-block: 1rem;
+    padding-inline: clamp(.85rem, 1.7vw, 1.35rem);
+    align-items: center;
+    flex-wrap: wrap;
+    background: #fff;
+}
+.fi-ta-header-toolbar > * { min-width:0; }
+.fi-ta-header-toolbar .fi-ta-search-field,
+.fi-ta-header-toolbar .fi-ta-search-field-ctn {
+    flex: 1 1 15rem;
+    max-width: 100%;
+    min-width: min(14rem, 100%);
+}
+.fi-ta-header-toolbar .fi-ac, .fi-ta-header-toolbar .fi-ta-actions { flex-wrap: wrap; gap: .5rem; }
+.fi-ta-header-toolbar :is(.fi-btn, .fi-icon-btn) { min-height: 2.35rem; }
+.fi-ta-header { padding-block: 1rem; }
+.fi-ta-header-heading, .fi-ta-header-description { overflow-wrap: anywhere; }
+/* Filter chips and actions with short but readable labels */
+.fi-ta-filters, .fi-ta-filters-above-content-ctn, .fi-ta-filter-indicators {
+    max-width: 100%; min-width: 0;
+}
+.fi-ta-filter-indicators { display:flex; flex-wrap:wrap; gap:.45rem; }
+.fi-ta-filter-indicator { max-width:100%; overflow-wrap:anywhere; }
+/* Table rows: preserve horizontal scrolling introduced in V1.3 */
+.fi-ta-content { min-width:0; max-width:100%; overflow-x:auto; overscroll-behavior-x:contain; }
+.fi-ta-table { border-collapse:separate; border-spacing:0; }
+.fi-ta-header-cell { padding-block: .8rem; }
+.fi-ta-header-cell-label { line-height: 1.4; }
+.fi-ta-row { transition: background-color .12s ease; }
+.fi-ta-row:nth-child(even) { background: rgba(243,249,251,.54); }
+.fi-ta-row:hover, .fi-ta-row:nth-child(even):hover { background: #edf8f9 !important; }
+.fi-ta-table tbody .fi-ta-cell { vertical-align:middle; }
+.fi-ta-text, .fi-ta-text-item, .fi-ta-text-item-label { line-height:1.55; }
+.fi-ta-cell .fi-badge, .fi-ta-table .fi-badge {
+    max-width: 100%; overflow-wrap: anywhere; white-space: normal;
+    line-height: 1.35; text-align: center;
+}
+/* Keep row action anchor visible near right edge, also in horizontally scrolled tables. */
+.fi-ta-table tbody td.fi-ta-actions-cell { padding-inline-start:.75rem !important; }
+.fi-ta-actions :is(button,a) { touch-action:manipulation; }
+.fi-ta-actions :is(button,a):focus-visible {
+    outline: 3px solid var(--tu20-focus);
+    outline-offset: 2px;
+}
+/* Empty states and pagination are part of the workflow. */
+.fi-ta-empty-state { padding: clamp(1.5rem, 4vw, 3.3rem); }
+.fi-ta-empty-state-heading { font-size: 1rem; letter-spacing: -.012em; }
+.fi-ta-empty-state-description { max-width: 45ch; margin-inline:auto; overflow-wrap:anywhere; }
+.fi-pagination, .fi-ta-pagination {
+    min-width: 0; gap: .5rem; flex-wrap: wrap;
+}
+.fi-pagination { padding-block:.75rem; }
+.fi-pagination :is(button, select, a) { min-height:2.1rem; }
+/* Form inputs, field explanations, and validation. */
+.fi-fo-field-wrp, .fi-fo-field-wrp > *, .fi-fo-field-wrp-label, .fi-section-content { min-width:0; }
+.fi-fo-field-wrp-label { line-height:1.45; }
+.fi-fo-field-wrp :is(.fi-fo-field-wrp-helper-text,.fi-fo-field-wrp-hint,.fi-fo-field-wrp-error-message) {
+    max-width:100%; overflow-wrap:anywhere; line-height:1.55;
+}
+.fi-input-wrp { max-width:100%; border-radius: var(--tu20-radius); }
+.fi-input-wrp:focus-within { box-shadow: 0 0 0 2px rgba(19,141,146,.18); }
+.fi-fo-field-wrp input:not([type=checkbox]):not([type=radio]),
+.fi-fo-field-wrp select,
+.fi-fo-field-wrp textarea {
+    max-width:100%; min-width:0; line-height:1.55;
+}
+.fi-fo-field-wrp textarea { min-height:6rem; resize:vertical; overflow-wrap:anywhere; }
+.fi-fo-field-wrp input:disabled, .fi-fo-field-wrp textarea:disabled { cursor:not-allowed; }
+.fi-section-header { gap:.7rem; }
+.fi-section-content { overflow-wrap:anywhere; }
+.fi-fo-field-wrp-error-message { font-weight:600; }
+/* Save/cancel and modal actions remain visible on narrow windows. */
+.fi-form-actions, .fi-modal-footer-actions, .fi-modal-footer {
+    min-width:0; flex-wrap:wrap; gap:.65rem;
+}
+.fi-form-actions :is(button,a), .fi-modal-footer-actions :is(button,a) { min-height:2.5rem; }
+.fi-modal-window { max-width:calc(100vw - 1.25rem); }
+.fi-modal-heading, .fi-modal-description { overflow-wrap:anywhere; }
+.fi-dropdown-panel {
+    max-width:min(26rem, calc(100vw - 1.25rem));
+    overflow-wrap:anywhere;
+}
+/* Accessible visible focus for action links; no custom click interception. */
+.fi-main :is(a,button,input,textarea,select):focus-visible {
+    outline: 2px solid var(--tu20-focus);
+    outline-offset: 2px;
+}
+/* Responsive tables: horizontal scroll, never entire body/page. */
+@media (max-width: 767px) {
+    .fi-header { flex-wrap:wrap; }
+    .fi-header-actions { width:100%; }
+    .fi-header-actions :is(button,a) { max-width:100%; }
+    .fi-ta-header-toolbar { padding: .75rem; gap: .6rem; }
+    .fi-ta-header-toolbar .fi-ta-search-field,
+    .fi-ta-header-toolbar .fi-ta-search-field-ctn { flex:1 1 100%; width:100%; }
+    .fi-ta-header-toolbar .fi-ta-search-field input { min-width:0; width:100%; }
+    .fi-ta-header-toolbar .fi-ta-actions { max-width:100%; }
+    .fi-ta-table { width:max-content; min-width:100%; }
+    .fi-ta-table .fi-ta-header-cell { white-space:normal; }
+    .fi-ta-pagination { justify-content:center; }
+    .fi-form-actions :is(button,a) { max-width:100%; }
+}
+@media (max-width: 480px) {
+    .fi-header-heading { font-size:1.4rem !important; }
+    .fi-ta-header-toolbar :is(.fi-btn,.fi-icon-btn) { max-width:100%; }
+    .fi-modal-footer-actions { width:100%; }
+}
+/*
+ Dark mode V2.1: graphite/slate surfaces, soft-white text, silver borders,
+ and teal only as an interaction accent. Avoid pure black/white glare.
+*/
+.dark {
+    color-scheme: dark;
+    --tu-dark-canvas: #0f172a;
+    --tu-dark-surface: #172033;
+    --tu-dark-raised: #1e293b;
+    --tu-dark-input: #202c40;
+    --tu-dark-hover: #26364d;
+    --tu-dark-border: #475569;
+    --tu-dark-border-soft: #334155;
+    --tu-dark-text: #f1f5f9;
+    --tu-dark-muted: #b6c2d1;
+    --tu-dark-placeholder: #94a3b8;
+    --tu-dark-focus: #5eead4;
+    --tu-ink: var(--tu-dark-text);
+    --tu-muted: var(--tu-dark-muted);
+    --tu-line: var(--tu-dark-border-soft);
+    --tu-surface: var(--tu-dark-surface);
+    --tu-canvas: var(--tu-dark-canvas);
+    --tu-accent: #45c7b8;
+    --tu-accent-soft: #173d3c;
+    --tu12-background: var(--tu-dark-canvas);
+    --tu12-ink: var(--tu-dark-text);
+    --tu12-muted: var(--tu-dark-muted);
+    --tu12-border: var(--tu-dark-border-soft);
+    --tu12-surface: var(--tu-dark-surface);
+    --tu20-border: var(--tu-dark-border-soft);
+    --tu20-muted: var(--tu-dark-muted);
+    --tu20-focus: var(--tu-dark-focus);
+    --tu20-soft: var(--tu-dark-raised);
+    --tu-v1-bg: var(--tu-dark-canvas);
+    --tu-v1-ink: var(--tu-dark-text);
+    --tu-v1-muted: var(--tu-dark-muted);
+    --tu-v1-line: var(--tu-dark-border-soft);
+    --tu-v1-card: var(--tu-dark-surface);
+}
+
+.dark .fi-body,
+.dark .fi-simple-layout,
+.dark .fi-simple-main-ctn {
+    background-color: var(--tu-dark-canvas) !important;
+    color: var(--tu-dark-text);
+}
+
+.dark .fi-simple-main {
+    border: 1px solid var(--tu-dark-border-soft) !important;
+    border-top: 4px solid #45c7b8 !important;
+    background: var(--tu-dark-surface) !important;
+    box-shadow: 0 24px 70px rgba(2, 6, 23, .42) !important;
+}
+
+.dark .fi-simple-header-heading,
+.dark .fi-header-heading,
+.dark .fi-section-header-heading,
+.dark .fi-fo-field-wrp-label,
+.dark .fi-fo-field-wrp-label span,
+.dark .fi-ta-text-item-label {
+    color: var(--tu-dark-text) !important;
+}
+
+.dark .fi-simple-header-subheading,
+.dark .fi-header-subheading,
+.dark .fi-section-header-description,
+.dark .fi-fo-field-wrp-helper-text,
+.dark .fi-fo-field-wrp-hint,
+.dark .tu-login-note {
+    color: var(--tu-dark-muted) !important;
+}
+
+.dark .fi-section,
+.dark .fi-ta-ctn,
+.dark .fi-fo-section,
+.dark .fi-wi-stats-overview-stat,
+.dark .fi-card,
+.dark .fi-modal-window,
+.dark .fi-dropdown-panel,
+.dark .fi-tabs {
+    border-color: var(--tu-dark-border-soft) !important;
+    background-color: var(--tu-dark-surface) !important;
+}
+
+.dark .fi-topbar nav,
+.dark .fi-topbar-open-sidebar-btn,
+.dark .fi-ta-header-toolbar {
+    border-color: var(--tu-dark-border-soft) !important;
+    background: var(--tu-dark-surface) !important;
+}
+
+/* Input wrapper and its controls must change together to avoid white-on-white text. */
+.dark .fi-input-wrp,
+.dark .fi-select-input,
+.dark .fi-fo-rich-editor {
+    border-color: var(--tu-dark-border) !important;
+    background-color: var(--tu-dark-input) !important;
+    color: var(--tu-dark-text) !important;
+}
+
+.dark .fi-input,
+.dark .fi-select-input,
+.dark .fi-fo-field-wrp input:not([type='checkbox']):not([type='radio']),
+.dark .fi-fo-field-wrp select,
+.dark .fi-fo-field-wrp textarea {
+    background-color: transparent !important;
+    color: var(--tu-dark-text) !important;
+    caret-color: var(--tu-dark-focus);
+}
+
+.dark .fi-input::placeholder,
+.dark .fi-fo-field-wrp input::placeholder,
+.dark .fi-fo-field-wrp textarea::placeholder {
+    color: var(--tu-dark-placeholder) !important;
+    opacity: 1;
+}
+
+.dark .fi-input-wrp-prefix,
+.dark .fi-input-wrp-suffix,
+.dark .fi-input-wrp-prefix .fi-icon,
+.dark .fi-input-wrp-suffix .fi-icon,
+.dark .fi-input-wrp button {
+    color: var(--tu-dark-muted) !important;
+}
+
+.dark .fi-input-wrp:focus-within {
+    border-color: var(--tu-dark-focus) !important;
+    outline: 2px solid rgba(94, 234, 212, .72) !important;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 3px rgba(94, 234, 212, .14) !important;
+}
+
+.dark .fi-input-wrp.fi-disabled,
+.dark .fi-input-wrp:has(:disabled) {
+    border-color: var(--tu-dark-border-soft) !important;
+    background: #182234 !important;
+    opacity: .78;
+}
+
+.dark .fi-fo-field-wrp input:-webkit-autofill,
+.dark .fi-fo-field-wrp input:-webkit-autofill:hover,
+.dark .fi-fo-field-wrp input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--tu-dark-text) !important;
+    caret-color: var(--tu-dark-focus);
+    box-shadow: 0 0 0 1000px var(--tu-dark-input) inset !important;
+    transition: background-color 9999s ease-out 0s;
+}
+
+.dark .fi-checkbox-input {
+    border-color: var(--tu-dark-border) !important;
+    background-color: var(--tu-dark-input);
+}
+
+.dark .fi-ta-header-cell {
+    background: var(--tu-dark-raised) !important;
+}
+
+.dark .fi-ta-header-cell-label {
+    color: #cbd5e1 !important;
+}
+
+.dark .fi-ta-row {
+    border-color: var(--tu-dark-border-soft) !important;
+    background: var(--tu-dark-surface);
+}
+
+.dark .fi-ta-row:nth-child(even) {
+    background: rgba(30, 41, 59, .72);
+}
+
+.dark .fi-ta-row:hover,
+.dark .fi-ta-row:nth-child(even):hover {
+    background: var(--tu-dark-hover) !important;
+}
+
+.dark .fi-dropdown-list-item:hover,
+.dark .fi-dropdown-list-item:focus-visible,
+.dark .fi-tabs-item:hover {
+    background: var(--tu-dark-hover) !important;
+}
+
+/* Dashboard V1.2 contains hard-coded white surfaces; override them last. */
+.dark .tu-dashboard :is(.tu-priority, .tu-quick-nav, .tu-attention),
+.dark .tu-dashboard .tu-letter-card,
+.dark .tu-dashboard .tu-module-link,
+.dark .tu-dashboard .tu-utilities {
+    border-color: var(--tu-dark-border-soft) !important;
+    background: var(--tu-dark-surface) !important;
+    box-shadow: none !important;
+}
+
+.dark .tu-dashboard :is(.tu-section-heading h2, .tu-letter-card h3, .tu-module-copy strong, .tu-attention-copy strong, .tu-attention-count) {
+    color: var(--tu-dark-text) !important;
+}
+
+.dark .tu-dashboard :is(.tu-section-heading > span, .tu-letter-meta, .tu-letter-number, .tu-module-copy small, .tu-attention-copy small) {
+    color: var(--tu-dark-muted) !important;
+}
+
+.dark .tu-dashboard .tu-module-link:hover,
+.dark .tu-dashboard .tu-attention-row:hover,
+.dark .tu-dashboard .tu-letter-card:hover {
+    border-color: var(--tu-dark-border) !important;
+    background: var(--tu-dark-hover) !important;
+}
+/* Printing table data: don't print sticky navigation or UI-only buttons */
+@media print {
+    .fi-sidebar, .fi-topbar, .fi-ta-header-toolbar, .fi-ta-actions, .fi-pagination { display:none !important; }
+    .fi-main, .fi-ta-ctn, .fi-page { background:#fff !important; color:#111 !important; box-shadow:none !important; }
+    .fi-ta-content { overflow:visible !important; }
+    .fi-ta-row { break-inside:avoid; }
+}
+@media (prefers-reduced-motion:reduce) { .fi-ta-row { transition:none; } }

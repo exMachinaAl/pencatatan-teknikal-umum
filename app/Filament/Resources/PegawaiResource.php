@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\PegawaiResource\Pages;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
@@ -15,9 +16,13 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\HtmlString;
 
 class PegawaiResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = Pegawai::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-users';
@@ -29,6 +34,11 @@ class PegawaiResource extends Resource
     protected static ?string $pluralModelLabel = 'Data Pegawai';
 
     protected static ?int $navigationSort = 1;
+
+    protected static function accessModule(): string
+    {
+        return 'kepegawaian';
+    }
 
     public static function form(Form $form): Form
     {
@@ -47,6 +57,38 @@ class PegawaiResource extends Resource
                             ->helperText('Kosongkan jika pegawai Non-PNS / Honorer')
                             ->maxLength(30)
                             ->unique(ignoreRecord: true),
+
+                        Forms\Components\FileUpload::make('foto_path')
+                            ->label('Foto Profil Pegawai')
+                            ->disk('local')
+                            ->directory('profil_pegawai')
+                            ->visibility('private')
+                            ->image()
+                            ->imageEditor()
+                            ->imagePreviewHeight('180')
+                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
+                            ->maxSize(2048)
+                            ->getUploadedFileUsing(function (?Pegawai $record, string $file): ?array {
+                                $storage = Storage::disk('local');
+
+                                if (! $record || ! $storage->exists($file)) {
+                                    return null;
+                                }
+
+                                return [
+                                    'name' => basename($file),
+                                    'size' => $storage->size($file),
+                                    'type' => $storage->mimeType($file),
+                                    'url' => route('profil.pegawai.foto', $record),
+                                ];
+                            }),
+
+                        Forms\Components\Placeholder::make('foto_saat_ini')
+                            ->label('Preview tersimpan')
+                            ->content(fn (?Pegawai $record): HtmlString|string => $record?->foto_path
+                                ? new HtmlString('<img src="'.e(route('profil.pegawai.foto', $record)).'" alt="Foto pegawai" style="width:8rem;height:8rem;object-fit:cover;border-radius:9999px;border:1px solid #64748b">')
+                                : 'Belum ada foto profil.')
+                            ->visible(fn (?Pegawai $record): bool => $record !== null),
 
                         Forms\Components\Select::make('status_kepegawaian')
                             ->label('Status Kepegawaian')
@@ -76,6 +118,56 @@ class PegawaiResource extends Resource
                             ->inline(false),
                     ])->columns(2),
 
+                Forms\Components\Section::make('Kontak & Biodata')
+                    ->description('Informasi pendukung untuk komunikasi dan administrasi internal.')
+                    ->schema([
+                        Forms\Components\TextInput::make('email')
+                            ->label('Email Pegawai')
+                            ->email()
+                            ->rule('not_regex:/[\r\n]/')
+                            ->unique(ignoreRecord: true)
+                            ->maxLength(160),
+
+                        Forms\Components\TextInput::make('nomor_telepon')
+                            ->label('Nomor Telepon / WhatsApp')
+                            ->tel()
+                            ->rule('regex:/^[0-9+().\-\s]{6,30}$/')
+                            ->maxLength(30),
+
+                        Forms\Components\TextInput::make('tempat_lahir')
+                            ->label('Tempat Lahir')
+                            ->maxLength(100),
+
+                        Forms\Components\DatePicker::make('tanggal_lahir')
+                            ->label('Tanggal Lahir')
+                            ->maxDate(now())
+                            ->displayFormat('d/m/Y'),
+
+                        Forms\Components\Select::make('jenis_kelamin')
+                            ->label('Jenis Kelamin')
+                            ->options(Pegawai::JENIS_KELAMIN),
+
+                        Forms\Components\Textarea::make('alamat')
+                            ->label('Alamat Domisili')
+                            ->rows(3)
+                            ->maxLength(1000)
+                            ->columnSpanFull(),
+
+                        Forms\Components\TextInput::make('unit_kerja')
+                            ->label('Unit Kerja')
+                            ->placeholder('Contoh: Tata Usaha, Kurikulum, Laboratorium')
+                            ->maxLength(120),
+
+                        Forms\Components\TextInput::make('pendidikan_terakhir')
+                            ->label('Pendidikan Terakhir')
+                            ->placeholder('Contoh: S1 Administrasi Pendidikan')
+                            ->maxLength(100),
+
+                        Forms\Components\DatePicker::make('tanggal_mulai_tugas')
+                            ->label('Tanggal Mulai Bertugas')
+                            ->displayFormat('d/m/Y'),
+                    ])->columns(2)->collapsible(),
+
                 Forms\Components\Section::make('Riwayat TMT Terakhir')
                     ->description('Digunakan untuk kalkulasi otomatis Kenaikan Pangkat (4 thn) & KGB (2 thn)')
                     ->collapsible()
@@ -98,6 +190,12 @@ class PegawaiResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('foto_path')
+                    ->label('Foto')
+                    ->getStateUsing(fn (Pegawai $record): ?string => $record->foto_path ? route('profil.pegawai.foto', $record) : null)
+                    ->circular()
+                    ->height(40),
+
                 Tables\Columns\TextColumn::make('nama')
                     ->label('Nama Pegawai')
                     ->searchable()
@@ -117,7 +215,14 @@ class PegawaiResource extends Resource
                 Tables\Columns\TextColumn::make('jabatan')
                     ->label('Jabatan')
                     ->searchable()
-                    ->limit(30),
+                    ->limit(30)
+                    ->description(fn (Pegawai $record): ?string => $record->unit_kerja),
+
+                Tables\Columns\TextColumn::make('nomor_telepon')
+                    ->label('Kontak')
+                    ->searchable(['nomor_telepon', 'email'])
+                    ->description(fn (Pegawai $record): ?string => $record->email)
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('golongan.kode')
                     ->label('Gol/Ruang')
@@ -188,11 +293,13 @@ class PegawaiResource extends Resource
                         ->label('Ajukan Kenaikan Pangkat')
                         ->icon('heroicon-o-arrow-trending-up')
                         ->color('success')
+                        ->authorize(fn (): bool => static::resourcePermission('create'))
                         ->url(fn (Pegawai $record) => route('filament.admin.resources.kenaikan-pangkats.create', ['pegawai_id' => $record->id])),
                     Tables\Actions\Action::make('buat_kgb')
                         ->label('Proses Gaji Berkala')
                         ->icon('heroicon-o-banknotes')
                         ->color('warning')
+                        ->authorize(fn (): bool => static::resourcePermission('create'))
                         ->url(fn (Pegawai $record) => route('filament.admin.resources.gaji-berkalas.create', ['pegawai_id' => $record->id])),
                     Tables\Actions\DeleteAction::make(),
                 ]),
@@ -204,7 +311,9 @@ class PegawaiResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="data-pegawai-' . date('Ymd-His') . '.csv"',
@@ -212,14 +321,19 @@ class PegawaiResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama', 'Status', 'Jabatan', 'Golongan', 'TMT Pangkat Terakhir', 'TMT KGB Terakhir', 'Status Aktif']);
+                                fputcsv($handle, ['NIP', 'Nama', 'Email', 'Telepon', 'Status', 'Jabatan', 'Unit Kerja', 'Golongan', 'Pendidikan', 'Mulai Tugas', 'TMT Pangkat Terakhir', 'TMT KGB Terakhir', 'Status Aktif']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->nip,
                                         $row->nama,
+                                        $row->email,
+                                        $row->nomor_telepon,
                                         $row->status_kepegawaian,
                                         $row->jabatan,
+                                        $row->unit_kerja,
                                         $row->golongan?->kode,
+                                        $row->pendidikan_terakhir,
+                                        $row->tanggal_mulai_tugas?->format('Y-m-d'),
                                         $row->tmt_pangkat_terakhir?->format('Y-m-d'),
                                         $row->tmt_kgb_terakhir?->format('Y-m-d'),
                                         $row->is_active ? 'Aktif' : 'Non-Aktif',

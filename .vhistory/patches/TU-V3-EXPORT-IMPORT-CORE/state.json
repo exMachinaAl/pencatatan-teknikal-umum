@@ -1,0 +1,10 @@
+{
+    "patch_id": "TU-V3-EXPORT-IMPORT-CORE",
+    "status": "applied",
+    "applied_at": "2026-10-19T03:55:09+00:00",
+    "files": {
+        "app/Services/TuDataExchange.php": "bceaa95e8ef529815f28ee18fe7d745cc368bde517087d64f50a68f0a0b7cecb",
+        "app/Filament/Pages/TuDataExchangePage.php": "012f8e05182cd0822af0ca3ba56f96f17299a3b98fc5601518543fe66e8e5fc9",
+        "resources/views/filament/pages/tu-data-exchange.blade.php": "ab99e037c620857bece55256531baa2bcf929b9bc2872a9f9f64639f4551a4c2"
+    }
+}

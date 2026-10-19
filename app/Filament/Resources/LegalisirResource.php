@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\LegalisirResource\Pages;
 use App\Models\Legalisir;
 use Filament\Forms;
@@ -10,12 +11,13 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
 
 class LegalisirResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = Legalisir::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-check';
@@ -28,6 +30,11 @@ class LegalisirResource extends Resource
 
     protected static ?int $navigationSort = 1;
 
+    protected static function accessModule(): string
+    {
+        return 'legalisir';
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -36,9 +43,10 @@ class LegalisirResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('nomor_legalisir')
                             ->label('Nomor Registrasi Legalisir')
-                            ->default(fn () => Legalisir::generateNomorLegalisir())
-                            ->required()
-                            ->unique(ignoreRecord: true),
+                            ->helperText('Dihasilkan otomatis ketika data disimpan dan tidak dapat diubah.')
+                            ->placeholder('Otomatis saat disimpan')
+                            ->disabled()
+                            ->dehydrated(false),
 
                         Forms\Components\DatePicker::make('tanggal_permohonan')
                             ->label('Tanggal Permohonan')
@@ -55,7 +63,20 @@ class LegalisirResource extends Resource
                         Forms\Components\TextInput::make('kontak')
                             ->label('No. Telepon / WhatsApp')
                             ->tel()
+                            ->maxLength(60)
                             ->placeholder('08xxxxxxxxxx'),
+
+                        Forms\Components\TextInput::make('email_pemohon')
+                            ->label('Email Pemohon')
+                            ->email()
+                            ->rule('not_regex:/[\r\n]/')
+                            ->maxLength(150),
+
+                        Forms\Components\Select::make('kanal_notifikasi')
+                            ->label('Notifikasi Saat Siap')
+                            ->options(Legalisir::KANAL_NOTIFIKASI)
+                            ->default('tidak_ada')
+                            ->required(),
 
                         Forms\Components\Select::make('status_pemohon')
                             ->label('Status Pemohon')
@@ -69,17 +90,30 @@ class LegalisirResource extends Resource
                             ->default('Ijazah')
                             ->required(),
 
+                        Forms\Components\TextInput::make('nomor_dokumen')
+                            ->label('Nomor Dokumen')
+                            ->maxLength(120),
+
+                        Forms\Components\TextInput::make('tahun_lulus')
+                            ->label('Tahun Lulus')
+                            ->numeric()
+                            ->minValue(1950)
+                            ->maxValue((int) date('Y')),
+
                         Forms\Components\TextInput::make('jumlah_lembar')
                             ->label('Jumlah Lembar / Rangkap')
                             ->numeric()
                             ->default(1)
                             ->minValue(1)
+                            ->maxValue(10000)
                             ->required(),
 
                         Forms\Components\TextInput::make('biaya')
                             ->label('Biaya Administrasi (Rp)')
                             ->numeric()
                             ->default(0)
+                            ->minValue(0)
+                            ->maxValue(9999999999.99)
                             ->prefix('Rp')
                             ->helperText('Gratis (Rp 0) untuk layanan sekolah negeri standar'),
                     ])->columns(2),
@@ -99,6 +133,10 @@ class LegalisirResource extends Resource
                             ->label('Tanggal Selesai / Siap Diambil')
                             ->displayFormat('d/m/Y'),
 
+                        Forms\Components\DateTimePicker::make('jadwal_pengambilan')
+                            ->label('Jadwal Pengambilan')
+                            ->seconds(false),
+
                         Forms\Components\DatePicker::make('tanggal_diambil')
                             ->label('Tanggal Penyerahan / Diambil')
                             ->displayFormat('d/m/Y'),
@@ -106,6 +144,24 @@ class LegalisirResource extends Resource
                         Forms\Components\TextInput::make('pengambil')
                             ->label('Nama Penerima / Pengambil Dokumen')
                             ->placeholder('Nama yang mengambil (jika diwakilkan)'),
+
+                        Forms\Components\TextInput::make('hubungan_pengambil')
+                            ->label('Hubungan dengan Pemohon'),
+
+                        Forms\Components\FileUpload::make('bukti_serah_terima_path')
+                            ->label('Bukti Serah Terima')
+                            ->disk('local')
+                            ->directory('legalisir_serah_terima')
+                            ->visibility('private')
+                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                            ->maxSize(5120),
+
+                        Forms\Components\Fieldset::make('Checklist Verifikasi')
+                            ->schema([
+                                Forms\Components\Checkbox::make('dokumen_asli_dilihat')->label('Dokumen asli telah dilihat'),
+                                Forms\Components\Checkbox::make('identitas_cocok')->label('Identitas pemohon cocok'),
+                                Forms\Components\Checkbox::make('data_sekolah_cocok')->label('Data sekolah cocok'),
+                            ])->columns(1)->columnSpanFull(),
 
                         Forms\Components\FileUpload::make('file_dokumen_path')
                             ->label('Scan Dokumen Asli / Berkas Verifikasi (PDF/JPG/PNG)')
@@ -120,6 +176,12 @@ class LegalisirResource extends Resource
                             ->label('Catatan Petugas (Tahun Lulus, No Seri Ijazah, dll)')
                             ->rows(3)
                             ->columnSpanFull(),
+
+                        Forms\Components\Textarea::make('alasan_penolakan')
+                            ->label('Alasan Penolakan')
+                            ->rows(2)
+                            ->visible(fn (Forms\Get $get): bool => $get('status') === 'ditolak')
+                            ->columnSpanFull(),
                     ])->columns(2),
             ]);
     }
@@ -128,11 +190,12 @@ class LegalisirResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('nomor_legalisir')
-                    ->label('No. Registrasi')
+                Tables\Columns\TextColumn::make('nomor_antrean')
+                    ->label('No. Antrean')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->description(fn (Legalisir $record) => $record->nomor_legalisir),
 
                 Tables\Columns\TextColumn::make('nama_pemohon')
                     ->label('Nama Pemohon')
@@ -217,33 +280,63 @@ class LegalisirResource extends Resource
                         ->label('Cetak Bukti Penerimaan')
                         ->icon('heroicon-o-printer')
                         ->color('success')
+                        ->authorize(fn (): bool => static::resourcePermission('print'))
                         ->url(fn (Legalisir $record) => route('legalisir.cetak-bukti', $record->id))
                         ->openUrlInNewTab(),
                     Tables\Actions\Action::make('tandai_siap')
                         ->label('Tandai Siap Diambil')
                         ->icon('heroicon-o-check')
                         ->color('warning')
-                        ->action(fn (Legalisir $record) => $record->update([
-                            'status' => 'siap_diambil',
-                            'tanggal_selesai' => now(),
-                        ])),
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (Legalisir $record): bool => in_array($record->status, ['diterima', 'diproses'], true))
+                        ->form([
+                            Forms\Components\Checkbox::make('dokumen_asli_dilihat')->label('Dokumen asli telah dilihat')->accepted()->required(),
+                            Forms\Components\Checkbox::make('identitas_cocok')->label('Identitas pemohon cocok')->accepted()->required(),
+                            Forms\Components\Checkbox::make('data_sekolah_cocok')->label('Data sekolah cocok')->accepted()->required(),
+                            Forms\Components\DateTimePicker::make('jadwal_pengambilan')->label('Jadwal Pengambilan')->default(now()->addDay())->required()->seconds(false),
+                        ])
+                        ->action(function (Legalisir $record, array $data) {
+                            static::authorizeResourceAction('transition');
+                            $record->update([
+                                'status' => 'siap_diambil',
+                                'tanggal_selesai' => now(),
+                                'diverifikasi_oleh' => Auth::id(),
+                                'diverifikasi_pada' => now(),
+                                ...$data,
+                            ]);
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('tandai_diambil')
                         ->label('Tandai Sudah Diambil')
                         ->icon('heroicon-o-hand-thumb-up')
                         ->color('primary')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (Legalisir $record): bool => $record->status === 'siap_diambil')
                         ->form([
                             Forms\Components\TextInput::make('pengambil')
                                 ->label('Nama Pengambil')
                                 ->default(fn (Legalisir $record) => $record->nama_pemohon)
                                 ->required(),
+                            Forms\Components\TextInput::make('hubungan_pengambil')
+                                ->label('Hubungan dengan Pemohon')
+                                ->default('Diri sendiri')
+                                ->required(),
+                            Forms\Components\FileUpload::make('bukti_serah_terima_path')
+                                ->label('Bukti Serah Terima')
+                                ->disk('local')->directory('legalisir_serah_terima')->visibility('private')
+                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])->maxSize(5120),
                         ])
                         ->action(function (Legalisir $record, array $data) {
+                            static::authorizeResourceAction('transition');
                             $record->update([
                                 'status' => 'diambil',
                                 'pengambil' => $data['pengambil'],
+                                'hubungan_pengambil' => $data['hubungan_pengambil'],
+                                'bukti_serah_terima_path' => $data['bukti_serah_terima_path'] ?? null,
                                 'tanggal_diambil' => now(),
                             ]);
-                        }),
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -253,10 +346,12 @@ class LegalisirResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="legalisir-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="legalisir-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records) {
@@ -298,6 +393,7 @@ class LegalisirResource extends Resource
         return [
             'index' => Pages\ListLegalisirs::route('/'),
             'create' => Pages\CreateLegalisir::route('/create'),
+            'view' => Pages\ViewLegalisir::route('/{record}'),
             'edit' => Pages\EditLegalisir::route('/{record}/edit'),
         ];
     }

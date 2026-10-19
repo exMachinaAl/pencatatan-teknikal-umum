@@ -1,0 +1,15 @@
+{
+    "patch_id": "TU-UI-V2_0-OPERATIONAL",
+    "status": "applied",
+    "applied_at": "2026-10-19T03:19:06+00:00",
+    "old_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "14eb5cec5840726aaa803506e9758cde466d4563b04b47cdc52921b2b1eca771",
+        "public/css/tu-ui-v20-operasional.css": null
+    },
+    "new_hashes": {
+        "resources/views/filament/hooks/vite.blade.php": "4c049b24e08a9873642a10e7d06ad8915793f5fa9ef369f3c9c5708adee604ee",
+        "public/css/tu-ui-v20-operasional.css": "c8edd2b6f0164b1e9ea03630dad0923318527e989290394131b1735c1ac8bf68"
+    },
+    "css_old_exists": false,
+    "backup_dir": ".trash/TU-UI-V2_0-OPERATIONAL"
+}

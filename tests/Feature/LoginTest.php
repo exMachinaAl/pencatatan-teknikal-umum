@@ -30,7 +30,7 @@ class LoginTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $user = User::create([
             'name' => 'Operator', 'email' => 'operator@test.com',
-            'password' => 'password', 'role' => 'staf', 'is_active' => true,
+            'password' => 'password', 'role' => User::ROLE_PETUGAS_TU, 'is_active' => true,
         ]);
 
         Livewire::test(Login::class)
@@ -47,7 +47,7 @@ class LoginTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $user = User::create([
             'name' => 'Operator', 'email' => 'operator@test.com',
-            'password' => 'password', 'role' => 'staf', 'is_active' => true,
+            'password' => 'password', 'role' => User::ROLE_PETUGAS_TU, 'is_active' => true,
         ]);
 
         Livewire::test(Login::class)
@@ -96,7 +96,8 @@ class LoginTest extends TestCase
         $response
             ->assertStatus(200)
             ->assertSee('Ruang Kerja Tata Usaha')
-            ->assertSee('Pilih ruang kerja')
+            ->assertSee('Administrator Sistem (Fasilitator TI)')
+            ->assertSee('Pengaturan dan utilitas')
             ->assertSee('Surat yang perlu dilihat');
     }
 }

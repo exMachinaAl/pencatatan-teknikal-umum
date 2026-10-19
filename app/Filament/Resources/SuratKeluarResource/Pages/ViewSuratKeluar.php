@@ -10,6 +10,8 @@ class ViewSuratKeluar extends ViewRecord
 {
     protected static string $resource = SuratKeluarResource::class;
 
+    protected static string $view = 'filament.resources.pages.document-view';
+
     protected function getHeaderActions(): array
     {
         return [

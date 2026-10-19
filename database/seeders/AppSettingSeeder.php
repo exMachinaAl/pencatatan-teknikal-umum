@@ -41,11 +41,6 @@ class AppSettingSeeder extends Seeder
                 'deskripsi' => 'NIP Kepala Sekolah',
             ],
             [
-                'key' => 'format_surat_keluar',
-                'value' => '421/{nomor_urut}/SMAN1/{tahun}',
-                'deskripsi' => 'Format kode nomor surat keluar ({nomor_urut}, {tahun}, {kode_klasifikasi})',
-            ],
-            [
                 'key' => 'periode_kp_standar_tahun',
                 'value' => '4',
                 'deskripsi' => 'Standar interval tahun untuk kenaikan pangkat reguler',

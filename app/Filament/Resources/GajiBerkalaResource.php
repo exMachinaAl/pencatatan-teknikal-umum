@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\GajiBerkalaResource\Pages;
 use App\Models\GajiBerkala;
 use App\Models\Pegawai;
@@ -15,10 +16,13 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
 class GajiBerkalaResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = GajiBerkala::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
@@ -30,6 +34,11 @@ class GajiBerkalaResource extends Resource
     protected static ?string $pluralModelLabel = 'Kenaikan Gaji Berkala (KGB)';
 
     protected static ?int $navigationSort = 3;
+
+    protected static function accessModule(): string
+    {
+        return 'kepegawaian';
+    }
 
     public static function form(Form $form): Form
     {
@@ -78,35 +87,45 @@ class GajiBerkalaResource extends Resource
                         Forms\Components\DatePicker::make('tmt_berikutnya')
                             ->label('TMT KGB Berikutnya')
                             ->helperText('Otomatis +2 tahun, dapat disesuaikan bila perlu')
+                            ->after('tmt')
                             ->displayFormat('d/m/Y'),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Masa Kerja & Besaran Gaji')
-                    ->description($canViewSalary ? 'Informasi nominal gaji pokok' : 'Data gaji dibatasi (Hanya Admin / Kepala TU)')
+                    ->description($canViewSalary ? 'Informasi nominal gaji pokok' : 'Data gaji dibatasi (hanya Kepala TU / Petugas Kepegawaian)')
                     ->collapsible()
                     ->collapsed()
                     ->schema([
                         Forms\Components\TextInput::make('mk_tahun')
                             ->label('Masa Kerja Golongan (Tahun)')
                             ->numeric()
+                            ->minValue(0)
+                            ->maxValue(60)
                             ->default(0)
                             ->required(),
 
                         Forms\Components\TextInput::make('mk_bulan')
                             ->label('Masa Kerja Golongan (Bulan)')
                             ->numeric()
+                            ->minValue(0)
+                            ->maxValue(11)
                             ->default(0)
                             ->required(),
 
                         Forms\Components\TextInput::make('gaji_pokok_lama')
                             ->label('Gaji Pokok Lama (Rp)')
                             ->numeric()
+                            ->minValue(0)
+                            ->maxValue(999999999999.99)
                             ->prefix('Rp')
                             ->visible($canViewSalary),
 
                         Forms\Components\TextInput::make('gaji_pokok_baru')
                             ->label('Gaji Pokok Baru (Rp)')
                             ->numeric()
+                            ->minValue(0)
+                            ->maxValue(999999999999.99)
+                            ->gte('gaji_pokok_lama')
                             ->prefix('Rp')
                             ->visible($canViewSalary),
                     ])->columns(2),
@@ -116,7 +135,8 @@ class GajiBerkalaResource extends Resource
                     ->collapsed()
                     ->schema([
                         Forms\Components\TextInput::make('nomor_sk')
-                            ->label('Nomor SK / Surat Pemberitahuan'),
+                            ->label('Nomor SK / Surat Pemberitahuan')
+                            ->maxLength(100),
 
                         Forms\Components\DatePicker::make('tanggal_sk')
                             ->label('Tanggal SK')
@@ -124,7 +144,8 @@ class GajiBerkalaResource extends Resource
 
                         Forms\Components\TextInput::make('pejabat_penetap')
                             ->label('Pejabat Penetap')
-                            ->placeholder('Contoh: Kepala Dinas Pendidikan Provinsi'),
+                            ->placeholder('Contoh: Kepala Dinas Pendidikan Provinsi')
+                            ->maxLength(150),
 
                         Forms\Components\Select::make('status')
                             ->label('Status Proses')
@@ -134,6 +155,7 @@ class GajiBerkalaResource extends Resource
 
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan Tambahan')
+                            ->maxLength(20000)
                             ->rows(3)
                             ->columnSpanFull(),
                     ])->columns(2),
@@ -238,13 +260,16 @@ class GajiBerkalaResource extends Resource
                         ->icon('heroicon-o-check-circle')
                         ->color('success')
                         ->requiresConfirmation()
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (GajiBerkala $record): bool => $record->status !== 'diserahkan')
                         ->action(function (GajiBerkala $record) {
-                            $record->update(['status' => 'diserahkan']);
-                            // Update TMT KGB terakhir di master Pegawai
-                            $record->pegawai->update([
-                                'tmt_kgb_terakhir' => $record->tmt,
-                            ]);
-                        }),
+                            static::authorizeResourceAction('transition');
+                            DB::transaction(function () use ($record): void {
+                                Pegawai::whereKey($record->pegawai_id)->lockForUpdate()->firstOrFail();
+                                $record->update(['status' => 'diserahkan']);
+                            });
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -254,7 +279,9 @@ class GajiBerkalaResource extends Resource
                     Tables\Actions\BulkAction::make('export_csv')
                         ->label('Ekspor CSV')
                         ->icon('heroicon-o-arrow-down-tray')
+                        ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) use ($canViewSalary) {
+                            static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="gaji-berkala-' . date('Ymd-His') . '.csv"',

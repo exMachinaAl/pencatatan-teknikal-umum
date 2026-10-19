@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
-use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
+use Illuminate\Validation\ValidationException;
 
 class SuratKeluar extends Model
 {
@@ -28,6 +29,12 @@ class SuratKeluar extends Model
         'penandatangan',
         'pembuat_konsep',
         'status',
+        'metode_pengiriman',
+        'nomor_resi',
+        'dikirim_pada',
+        'diterima_pada',
+        'diterima_oleh',
+        'bukti_pengiriman_path',
         'lokasi_arsip_fisik',
         'file_final_path',
         'tautan_gform',
@@ -39,6 +46,8 @@ class SuratKeluar extends Model
     protected $casts = [
         'tanggal_surat' => 'date',
         'diarsipkan_pada' => 'datetime',
+        'dikirim_pada' => 'datetime',
+        'diterima_pada' => 'datetime',
         'nomor_urut' => 'integer',
         'tahun' => 'integer',
     ];
@@ -56,37 +65,46 @@ class SuratKeluar extends Model
         'diarsipkan' => 'Diarsipkan',
     ];
 
-    /**
-     * Dihasilkan di dalam transaksi database untuk mencegah nomor ganda (race condition)
-     */
-    public static function generateNomorSurat(?int $tahun = null, ?string $kodeKlasifikasi = null): array
+    protected static function booted(): void
     {
-        $tahun = $tahun ?? (int) date('Y');
+        static::saving(function (SuratKeluar $surat): void {
+            $surat->sifat ??= 'biasa';
+            $surat->status ??= 'draf';
 
-        return DB::transaction(function () use ($tahun, $kodeKlasifikasi) {
-            $lastSurat = static::where('tahun', $tahun)
-                ->lockForUpdate()
-                ->orderByDesc('nomor_urut')
-                ->first();
+            $surat->nomor_surat = trim((string) $surat->nomor_surat);
 
-            $nomorUrut = $lastSurat ? ($lastSurat->nomor_urut + 1) : 1;
-            $nomorFormatted = str_pad($nomorUrut, 3, '0', STR_PAD_LEFT);
+            if ($surat->nomor_surat === '') {
+                throw ValidationException::withMessages(['nomor_surat' => 'Nomor surat resmi wajib diisi.']);
+            }
 
-            // Format konfigurasi dari AppSetting atau default
-            $template = AppSetting::get('format_surat_keluar', '421/{nomor_urut}/SMAN1/{tahun}');
-            $kode = $kodeKlasifikasi ?: '421';
+            $nomorSudahDipakai = static::withTrashed()
+                ->where('nomor_surat', $surat->nomor_surat)
+                ->when($surat->exists, fn ($query) => $query->whereKeyNot($surat->getKey()))
+                ->exists();
 
-            $nomorSurat = str_replace(
-                ['{nomor_urut}', '{tahun}', '{kode_klasifikasi}'],
-                [$nomorFormatted, $tahun, $kode],
-                $template
-            );
+            if ($nomorSudahDipakai) {
+                throw ValidationException::withMessages(['nomor_surat' => 'Nomor surat resmi sudah tercatat.']);
+            }
 
-            return [
-                'nomor_urut' => $nomorUrut,
-                'tahun' => $tahun,
-                'nomor_surat' => $nomorSurat,
-            ];
+            if (! $surat->tanggal_surat) {
+                throw ValidationException::withMessages(['tanggal_surat' => 'Tanggal surat wajib diisi.']);
+            }
+
+            $surat->tahun = Carbon::parse($surat->tanggal_surat)->year;
+
+            if (! array_key_exists((string) $surat->sifat, self::SIFAT)) {
+                throw ValidationException::withMessages(['sifat' => 'Sifat surat keluar tidak valid.']);
+            }
+
+            if (! array_key_exists((string) $surat->status, self::STATUSES)) {
+                throw ValidationException::withMessages(['status' => 'Status surat keluar tidak valid.']);
+            }
+        });
+
+        static::updating(function (SuratKeluar $surat): void {
+            if ($surat->isDirty('nomor_urut')) {
+                throw ValidationException::withMessages(['nomor_urut' => 'Nomor urut lama tidak dapat diubah.']);
+            }
         });
     }
 
@@ -103,5 +121,12 @@ class SuratKeluar extends Model
     public function lampiran(): MorphMany
     {
         return $this->morphMany(Lampiran::class, 'entitas', 'entitas', 'entitas_id');
+    }
+
+    public function suratMasukTerkait(): BelongsToMany
+    {
+        return $this->belongsToMany(SuratMasuk::class, 'relasi_surat', 'surat_keluar_id', 'surat_masuk_id')
+            ->withPivot(['jenis_relasi', 'catatan', 'created_by'])
+            ->withTimestamps();
     }
 }

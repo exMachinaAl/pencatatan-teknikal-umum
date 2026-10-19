@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\AuditLogResource\Pages;
 use App\Models\AuditLog;
 use Filament\Forms;
@@ -9,10 +10,11 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
 
 class AuditLogResource extends Resource
 {
+    use AuthorizesModuleAccess;
+
     protected static ?string $model = AuditLog::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
@@ -25,14 +27,14 @@ class AuditLogResource extends Resource
 
     protected static ?int $navigationSort = 3;
 
+    protected static function accessModule(): string
+    {
+        return 'audit';
+    }
+
     public static function canCreate(): bool
     {
         return false;
-    }
-
-    public static function canViewAny(): bool
-    {
-        return in_array(Auth::user()?->role, ['admin', 'kepala']);
     }
 
     public static function form(Form $form): Form

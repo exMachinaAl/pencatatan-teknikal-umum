@@ -14,11 +14,27 @@ use App\Models\SuratMasuk;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class SampleDataSeeder extends Seeder
 {
     public function run(): void
     {
+        if (! app()->environment(['local', 'testing'])) {
+            $this->command?->warn('SampleDataSeeder dilewati di luar lingkungan local/testing.');
+
+            return;
+        }
+
+        $this->enrichExistingSampleProfiles();
+
+        if (Pegawai::withTrashed()->whereIn('nip', ['19750815 200501 1 002', '197508152005011002'])->exists()) {
+            $this->command?->info('Data contoh sudah tersedia; SampleDataSeeder dilewati.');
+
+            return;
+        }
+
+        DB::transaction(function (): void {
         $admin = User::where('role', 'admin')->first();
         $gol3a = RefGolongan::where('kode', 'III/a')->first();
         $gol3b = RefGolongan::where('kode', 'III/b')->first();
@@ -34,40 +50,76 @@ class SampleDataSeeder extends Seeder
         // 1. Data Pegawai
         $pegawaiList = [
             [
-                'nip' => '19750815 200501 1 002',
+                'nip' => '197508152005011002',
                 'nama' => 'Ahmad Fauzi, S.Pd., M.Si',
+                'email' => 'ahmad.fauzi@sman1binabangsa.sch.id',
+                'nomor_telepon' => '081223450001',
+                'tempat_lahir' => 'Bandung',
+                'tanggal_lahir' => '1975-08-15',
+                'jenis_kelamin' => 'L',
+                'alamat' => 'Kota Bandung, Jawa Barat',
                 'status_kepegawaian' => 'PNS',
                 'jabatan' => 'Guru Matematika Ahli Madya',
+                'unit_kerja' => 'Matematika',
+                'pendidikan_terakhir' => 'S2 Pendidikan Matematika',
+                'tanggal_mulai_tugas' => '2005-01-01',
                 'golongan_id' => $gol4a?->id,
                 'tmt_pangkat_terakhir' => Carbon::now()->subYears(4)->format('Y-m-d'), // Calon KP sekarang!
                 'tmt_kgb_terakhir' => Carbon::now()->subYears(2)->addMonths(1)->format('Y-m-d'), // Jatuh tempo 1 bulan lagi!
                 'is_active' => true,
             ],
             [
-                'nip' => '19820320 200902 2 004',
+                'nip' => '198203202009022004',
                 'nama' => 'Dewi Anggraeni, M.Pd',
+                'email' => 'dewi.anggraeni@sman1binabangsa.sch.id',
+                'nomor_telepon' => '081223450002',
+                'tempat_lahir' => 'Garut',
+                'tanggal_lahir' => '1982-03-20',
+                'jenis_kelamin' => 'P',
+                'alamat' => 'Kabupaten Bandung, Jawa Barat',
                 'status_kepegawaian' => 'PNS',
                 'jabatan' => 'Guru Bahasa Indonesia Ahli Muda',
+                'unit_kerja' => 'Bahasa Indonesia',
+                'pendidikan_terakhir' => 'S2 Pendidikan Bahasa',
+                'tanggal_mulai_tugas' => '2009-02-01',
                 'golongan_id' => $gol3c?->id,
                 'tmt_pangkat_terakhir' => Carbon::now()->subYears(3)->format('Y-m-d'),
                 'tmt_kgb_terakhir' => Carbon::now()->subYears(2)->addMonths(2)->format('Y-m-d'), // Jatuh tempo 2 bulan lagi!
                 'is_active' => true,
             ],
             [
-                'nip' => '19900412 201801 1 003',
+                'nip' => '199004122018011003',
                 'nama' => 'Rian Hidayat, S.Kom',
+                'email' => 'rian.hidayat@sman1binabangsa.sch.id',
+                'nomor_telepon' => '081223450003',
+                'tempat_lahir' => 'Bandung',
+                'tanggal_lahir' => '1990-04-12',
+                'jenis_kelamin' => 'L',
+                'alamat' => 'Kota Cimahi, Jawa Barat',
                 'status_kepegawaian' => 'PNS',
                 'jabatan' => 'Guru Informatika / Operator TU',
+                'unit_kerja' => 'Informatika',
+                'pendidikan_terakhir' => 'S1 Teknik Informatika',
+                'tanggal_mulai_tugas' => '2018-01-01',
                 'golongan_id' => $gol3b?->id,
                 'tmt_pangkat_terakhir' => Carbon::now()->subYears(4)->addMonths(2)->format('Y-m-d'), // Calon KP dalam 2 bulan
                 'tmt_kgb_terakhir' => Carbon::now()->subYears(1)->format('Y-m-d'),
                 'is_active' => true,
             ],
             [
-                'nip' => '19951128 202221 2 009',
+                'nip' => '199511282022212009',
                 'nama' => 'Nurul Halimah, S.Pd',
+                'email' => 'nurul.halimah@sman1binabangsa.sch.id',
+                'nomor_telepon' => '081223450004',
+                'tempat_lahir' => 'Sumedang',
+                'tanggal_lahir' => '1995-11-28',
+                'jenis_kelamin' => 'P',
+                'alamat' => 'Kabupaten Sumedang, Jawa Barat',
                 'status_kepegawaian' => 'PPPK',
                 'jabatan' => 'Guru Biologi Ahli Pertama',
+                'unit_kerja' => 'Biologi',
+                'pendidikan_terakhir' => 'S1 Pendidikan Biologi',
+                'tanggal_mulai_tugas' => '2022-02-01',
                 'golongan_id' => $golPppk9?->id,
                 'tmt_pangkat_terakhir' => Carbon::now()->subYears(2)->format('Y-m-d'),
                 'tmt_kgb_terakhir' => Carbon::now()->subYears(2)->addDays(15)->format('Y-m-d'), // Jatuh tempo sangat dekat!
@@ -76,8 +128,17 @@ class SampleDataSeeder extends Seeder
             [
                 'nip' => null,
                 'nama' => 'Bambang Trianto',
+                'email' => 'bambang.trianto@sman1binabangsa.sch.id',
+                'nomor_telepon' => '081223450005',
+                'tempat_lahir' => 'Bandung',
+                'tanggal_lahir' => '1988-07-10',
+                'jenis_kelamin' => 'L',
+                'alamat' => 'Kota Bandung, Jawa Barat',
                 'status_kepegawaian' => 'Honorer',
                 'jabatan' => 'Staff Administrasi / Arsiparis',
+                'unit_kerja' => 'Tata Usaha',
+                'pendidikan_terakhir' => 'D3 Administrasi Perkantoran',
+                'tanggal_mulai_tugas' => '2015-07-01',
                 'golongan_id' => null,
                 'tmt_pangkat_terakhir' => null,
                 'tmt_kgb_terakhir' => null,
@@ -193,11 +254,8 @@ class SampleDataSeeder extends Seeder
         ]);
 
         // 5. Surat Keluar
-        $nomorSk1 = SuratKeluar::generateNomorSurat(null, '421.1');
         SuratKeluar::create([
-            'nomor_surat' => $nomorSk1['nomor_surat'],
-            'nomor_urut' => $nomorSk1['nomor_urut'],
-            'tahun' => $nomorSk1['tahun'],
+            'nomor_surat' => '421.1/001/SMAN1/'.Carbon::now()->year,
             'tanggal_surat' => Carbon::now()->subDays(1)->format('Y-m-d'),
             'tujuan' => 'Kepala Dinas Pendidikan Provinsi Jawa Barat',
             'perihal' => 'Laporan Rekapitulasi Kehadiran Guru dan Tenaga Kependidikan Bulan September 2026',
@@ -210,11 +268,8 @@ class SampleDataSeeder extends Seeder
             'created_by' => $admin?->id,
         ]);
 
-        $nomorSk2 = SuratKeluar::generateNomorSurat(null, '421.2');
         SuratKeluar::create([
-            'nomor_surat' => $nomorSk2['nomor_surat'],
-            'nomor_urut' => $nomorSk2['nomor_urut'],
-            'tahun' => $nomorSk2['tahun'],
+            'nomor_surat' => '421.2/002/SMAN1/'.Carbon::now()->year,
             'tanggal_surat' => Carbon::now()->format('Y-m-d'),
             'tujuan' => 'Orang Tua / Wali Siswa Kelas XII',
             'perihal' => 'Surat Pemberitahuan Simulasi Ujian dan Sosialisasi SNBP 2027',
@@ -255,5 +310,46 @@ class SampleDataSeeder extends Seeder
             'petugas_id' => $admin?->id,
             'catatan' => 'Permohonan untuk pendaftaran beasiswa pascasarjana.',
         ]);
+        });
+    }
+
+    private function enrichExistingSampleProfiles(): void
+    {
+        $profiles = [
+            '197508152005011002' => ['email' => 'ahmad.fauzi@sman1binabangsa.sch.id', 'nomor_telepon' => '081223450001', 'unit_kerja' => 'Matematika'],
+            '198203202009022004' => ['email' => 'dewi.anggraeni@sman1binabangsa.sch.id', 'nomor_telepon' => '081223450002', 'unit_kerja' => 'Bahasa Indonesia'],
+            '199004122018011003' => ['email' => 'rian.hidayat@sman1binabangsa.sch.id', 'nomor_telepon' => '081223450003', 'unit_kerja' => 'Informatika'],
+            '199511282022212009' => ['email' => 'nurul.halimah@sman1binabangsa.sch.id', 'nomor_telepon' => '081223450004', 'unit_kerja' => 'Biologi'],
+        ];
+
+        foreach ($profiles as $nip => $profile) {
+            $pegawai = Pegawai::withTrashed()->where('nip', $nip)->first();
+            if (! $pegawai) {
+                continue;
+            }
+
+            foreach ($profile as $field => $value) {
+                if (blank($pegawai->{$field})) {
+                    $pegawai->{$field} = $value;
+                }
+            }
+
+            if ($pegawai->isDirty()) {
+                $pegawai->save();
+            }
+        }
+
+        $honorer = Pegawai::withTrashed()->where('nama', 'Bambang Trianto')->first();
+        if ($honorer) {
+            foreach (['email' => 'bambang.trianto@sman1binabangsa.sch.id', 'nomor_telepon' => '081223450005', 'unit_kerja' => 'Tata Usaha'] as $field => $value) {
+                if (blank($honorer->{$field})) {
+                    $honorer->{$field} = $value;
+                }
+            }
+
+            if ($honorer->isDirty()) {
+                $honorer->save();
+            }
+        }
     }
 }
