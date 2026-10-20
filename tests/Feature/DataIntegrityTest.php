@@ -132,6 +132,65 @@ class DataIntegrityTest extends TestCase
         ]), 'tmt');
     }
 
+    public function test_kp_tanpa_tmt_memakai_masa_kerja_dan_menolak_duplikat(): void
+    {
+        [$old, $new] = $this->golonganPair();
+        $pegawai = Pegawai::create(['nama' => 'Pegawai KP Masa Kerja']);
+
+        $kp = KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 6,
+        ]);
+
+        $this->assertNull($kp->tmt);
+        $this->assertSame(8, $kp->mk_tahun);
+        $this->assertSame(6, $kp->mk_bulan);
+        $this->assertNotNull($kp->integrity_key);
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 6,
+        ]), 'mk_tahun');
+
+        KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 7,
+        ]);
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'pilihan',
+            'mk_tahun' => 9,
+            'mk_bulan' => 12,
+        ]), 'mk_bulan');
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'pilihan',
+            'mk_tahun' => 'delapan',
+            'mk_bulan' => 0,
+        ]), 'mk_tahun');
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'penyesuaian_ijazah',
+            'mk_tahun' => 10,
+            'mk_bulan' => 0,
+        ]), 'jenis');
+    }
+
     public function test_kgb_memvalidasi_nominal_masa_kerja_dan_menyinkronkan_tmt_final(): void
     {
         $pegawai = Pegawai::create([

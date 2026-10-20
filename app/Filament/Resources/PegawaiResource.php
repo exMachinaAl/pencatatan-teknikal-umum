@@ -13,8 +13,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\HtmlString;
 
 class PegawaiResource extends Resource
 {
@@ -41,8 +39,8 @@ class PegawaiResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Identitas Pegawai')
-                    ->description('Informasi data pribadi dan kepegawaian')
+                Forms\Components\Section::make('Data Inti Pegawai')
+                    ->description('Isi identitas utama yang diperlukan untuk administrasi kepegawaian.')
                     ->schema([
                         Forms\Components\TextInput::make('nama')
                             ->label('Nama Lengkap & Gelar')
@@ -50,42 +48,10 @@ class PegawaiResource extends Resource
                             ->maxLength(150),
 
                         Forms\Components\TextInput::make('nip')
-                            ->label('NIP / Nomor Induk')
-                            ->helperText('Kosongkan jika pegawai Non-PNS / Honorer')
+                            ->label('NIP')
+                            ->helperText('Kosongkan untuk pegawai yang belum atau tidak memiliki NIP.')
                             ->maxLength(30)
                             ->unique(ignoreRecord: true),
-
-                        Forms\Components\FileUpload::make('foto_path')
-                            ->label('Foto Profil Pegawai')
-                            ->disk('local')
-                            ->directory('profil_pegawai')
-                            ->visibility('private')
-                            ->image()
-                            ->imageEditor()
-                            ->imagePreviewHeight('180')
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->maxSize(2048)
-                            ->getUploadedFileUsing(function (?Pegawai $record, string $file): ?array {
-                                $storage = Storage::disk('local');
-
-                                if (! $record || ! $storage->exists($file)) {
-                                    return null;
-                                }
-
-                                return [
-                                    'name' => basename($file),
-                                    'size' => $storage->size($file),
-                                    'type' => $storage->mimeType($file),
-                                    'url' => route('profil.pegawai.foto', $record),
-                                ];
-                            }),
-
-                        Forms\Components\Placeholder::make('foto_saat_ini')
-                            ->label('Preview tersimpan')
-                            ->content(fn (?Pegawai $record): HtmlString|string => $record?->foto_path
-                                ? new HtmlString('<img src="'.e(route('profil.pegawai.foto', $record)).'" alt="Foto pegawai" style="width:8rem;height:8rem;object-fit:cover;border-radius:9999px;border:1px solid #64748b">')
-                                : 'Belum ada foto profil.')
-                            ->visible(fn (?Pegawai $record): bool => $record !== null),
 
                         Forms\Components\Select::make('status_kepegawaian')
                             ->label('Status Kepegawaian')
@@ -97,88 +63,13 @@ class PegawaiResource extends Resource
                             ->default('PNS')
                             ->required(),
 
-                        Forms\Components\TextInput::make('jabatan')
-                            ->label('Jabatan / Tugas Mengajar')
-                            ->placeholder('Contoh: Guru Matematika Ahli Madya, Staf TU')
-                            ->maxLength(120),
-
                         Forms\Components\Select::make('golongan_id')
                             ->label('Golongan / Ruang')
                             ->relationship('golongan', 'kode')
                             ->getOptionLabelFromRecordUsing(fn (RefGolongan $record) => "{$record->pangkat} ({$record->kode})")
                             ->searchable()
-                            ->preload(),
-
-                        Forms\Components\Toggle::make('is_active')
-                            ->label('Status Aktif')
-                            ->default(true)
-                            ->inline(false),
-                    ])->columns(2),
-
-                Forms\Components\Section::make('Kontak & Biodata')
-                    ->description('Informasi pendukung untuk komunikasi dan administrasi internal.')
-                    ->schema([
-                        Forms\Components\TextInput::make('email')
-                            ->label('Email Pegawai')
-                            ->email()
-                            ->rule('not_regex:/[\r\n]/')
-                            ->unique(ignoreRecord: true)
-                            ->maxLength(160),
-
-                        Forms\Components\TextInput::make('nomor_telepon')
-                            ->label('Nomor Telepon / WhatsApp')
-                            ->tel()
-                            ->rule('regex:/^[0-9+().\-\s]{6,30}$/')
-                            ->maxLength(30),
-
-                        Forms\Components\TextInput::make('tempat_lahir')
-                            ->label('Tempat Lahir')
-                            ->maxLength(100),
-
-                        Forms\Components\DatePicker::make('tanggal_lahir')
-                            ->label('Tanggal Lahir')
-                            ->maxDate(now())
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\Select::make('jenis_kelamin')
-                            ->label('Jenis Kelamin')
-                            ->options(Pegawai::JENIS_KELAMIN),
-
-                        Forms\Components\Textarea::make('alamat')
-                            ->label('Alamat Domisili')
-                            ->rows(3)
-                            ->maxLength(1000)
-                            ->columnSpanFull(),
-
-                        Forms\Components\TextInput::make('unit_kerja')
-                            ->label('Unit Kerja')
-                            ->placeholder('Contoh: Tata Usaha, Kurikulum, Laboratorium')
-                            ->maxLength(120),
-
-                        Forms\Components\TextInput::make('pendidikan_terakhir')
-                            ->label('Pendidikan Terakhir')
-                            ->placeholder('Contoh: S1 Administrasi Pendidikan')
-                            ->maxLength(100),
-
-                        Forms\Components\DatePicker::make('tanggal_mulai_tugas')
-                            ->label('Tanggal Mulai Bertugas')
-                            ->displayFormat('d/m/Y'),
-                    ])->columns(2)->collapsible(),
-
-                Forms\Components\Section::make('Riwayat TMT Terakhir')
-                    ->description('Digunakan untuk kalkulasi otomatis Kenaikan Pangkat (4 thn) & KGB (2 thn)')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\DatePicker::make('tmt_pangkat_terakhir')
-                            ->label('TMT Pangkat Terakhir')
-                            ->helperText('TMT SK Kenaikan Pangkat terakhir')
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\DatePicker::make('tmt_kgb_terakhir')
-                            ->label('TMT KGB Terakhir')
-                            ->helperText('TMT Kenaikan Gaji Berkala terakhir')
-                            ->displayFormat('d/m/Y'),
+                            ->preload()
+                            ->helperText('Boleh dikosongkan untuk pegawai yang tidak memiliki golongan.'),
                     ])->columns(2),
             ]);
     }
@@ -193,26 +84,16 @@ class PegawaiResource extends Resource
                     ->description(fn (Pegawai $record): string => collect([
                         $record->nip ?: 'Non-NIP',
                         $record->status_kepegawaian,
-                        $record->jabatan,
-                        $record->unit_kerja,
                         $record->golongan?->kode ? "Gol. {$record->golongan->kode}" : null,
-                        $record->is_active ? 'Aktif' : 'Nonaktif',
                     ])->filter()->implode(' · '))
                     ->weight('bold')
                     ->wrap()
                     ->extraAttributes(['class' => 'tu-mobile-summary'])
                     ->hiddenFrom('md'),
 
-                Tables\Columns\ImageColumn::make('foto_path')
-                    ->label('Foto')
-                    ->getStateUsing(fn (Pegawai $record): ?string => $record->foto_path ? route('profil.pegawai.foto', $record) : null)
-                    ->circular()
-                    ->height(40)
-                    ->visibleFrom('md'),
-
                 Tables\Columns\TextColumn::make('nama')
                     ->label('Nama Pegawai')
-                    ->searchable()
+                    ->searchable(['nama', 'nip'])
                     ->sortable()
                     ->weight('bold')
                     ->description(fn (Pegawai $record) => $record->nip ?: 'Non-NIP')
@@ -228,56 +109,10 @@ class PegawaiResource extends Resource
                     ->sortable()
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('jabatan')
-                    ->label('Jabatan')
-                    ->searchable()
-                    ->limit(30)
-                    ->description(fn (Pegawai $record): ?string => $record->unit_kerja)
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('nomor_telepon')
-                    ->label('Kontak')
-                    ->searchable(['nomor_telepon', 'email'])
-                    ->description(fn (Pegawai $record): ?string => $record->email)
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->visibleFrom('md'),
-
                 Tables\Columns\TextColumn::make('golongan.kode')
                     ->label('Gol/Ruang')
                     ->badge()
                     ->color('info')
-                    ->sortable()
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('tmt_pangkat_terakhir')
-                    ->label('TMT Pangkat')
-                    ->date('d M Y')
-                    ->sortable()
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('perkiraan_kp_berikutnya')
-                    ->label('Estimasi KP')
-                    ->state(function (Pegawai $record) {
-                        return $record->perkiraan_kp_berikutnya?->translatedFormat('M Y');
-                    })
-                    ->badge()
-                    ->color(fn (Pegawai $record) => $record->is_calon_kp ? 'danger' : 'gray')
-                    ->description(fn (Pegawai $record) => $record->is_calon_kp ? '⚡ Calon KP' : null)
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('perkiraan_kgb_berikutnya')
-                    ->label('Estimasi KGB')
-                    ->state(function (Pegawai $record) {
-                        return $record->perkiraan_kgb_berikutnya?->translatedFormat('d M Y');
-                    })
-                    ->badge()
-                    ->color(fn (Pegawai $record) => $record->is_jatuh_tempo_kgb ? 'warning' : 'gray')
-                    ->description(fn (Pegawai $record) => $record->is_jatuh_tempo_kgb ? '⏳ Jatuh Tempo' : null)
-                    ->visibleFrom('md'),
-
-                Tables\Columns\IconColumn::make('is_active')
-                    ->label('Aktif')
-                    ->boolean()
                     ->sortable()
                     ->visibleFrom('md'),
             ])
@@ -295,11 +130,11 @@ class PegawaiResource extends Resource
                     ->relationship('golongan', 'kode'),
 
                 Tables\Filters\Filter::make('calon_kp')
-                    ->label('⚡ Calon Kenaikan Pangkat (<= 6 Bulan)')
+                    ->label('Calon Kenaikan Pangkat (<= 6 Bulan)')
                     ->query(fn (Builder $query) => $query->calonKp()),
 
                 Tables\Filters\Filter::make('jatuh_tempo_kgb')
-                    ->label('⏳ Jatuh Tempo KGB (<= 3 Bulan)')
+                    ->label('Jatuh Tempo KGB (<= 3 Bulan)')
                     ->query(fn (Builder $query) => $query->whereNotNull('tmt_kgb_terakhir')
                         ->where('tmt_kgb_terakhir', '<=', now()->subYears(2)->addMonths(3))),
 
@@ -344,22 +179,13 @@ class PegawaiResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama', 'Email', 'Telepon', 'Status', 'Jabatan', 'Unit Kerja', 'Golongan', 'Pendidikan', 'Mulai Tugas', 'TMT Pangkat Terakhir', 'TMT KGB Terakhir', 'Status Aktif']);
+                                fputcsv($handle, ['NIP', 'Nama Lengkap & Gelar', 'Status Kepegawaian', 'Golongan / Ruang']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->nip,
                                         $row->nama,
-                                        $row->email,
-                                        $row->nomor_telepon,
                                         $row->status_kepegawaian,
-                                        $row->jabatan,
-                                        $row->unit_kerja,
                                         $row->golongan?->kode,
-                                        $row->pendidikan_terakhir,
-                                        $row->tanggal_mulai_tugas?->format('Y-m-d'),
-                                        $row->tmt_pangkat_terakhir?->format('Y-m-d'),
-                                        $row->tmt_kgb_terakhir?->format('Y-m-d'),
-                                        $row->is_active ? 'Aktif' : 'Non-Aktif',
                                     ]);
                                 }
                                 fclose($handle);

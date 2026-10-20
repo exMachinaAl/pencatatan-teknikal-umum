@@ -16,7 +16,8 @@ class CreateKenaikanPangkat extends CreateRecord
     protected function handleRecordCreation(array $data): Model
     {
         return DB::transaction(function () use ($data): Model {
-            Pegawai::whereKey($data['pegawai_id'])->lockForUpdate()->firstOrFail();
+            $pegawai = Pegawai::whereKey($data['pegawai_id'])->lockForUpdate()->firstOrFail();
+            $data['golongan_lama_id'] ??= $pegawai->golongan_id;
             $data['created_by'] = Auth::id();
 
             return static::getModel()::create($data);

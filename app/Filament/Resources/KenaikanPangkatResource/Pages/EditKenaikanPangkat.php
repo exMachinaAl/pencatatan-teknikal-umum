@@ -16,8 +16,13 @@ class EditKenaikanPangkat extends EditRecord
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         return DB::transaction(function () use ($record, $data): Model {
-            Pegawai::whereKey($data['pegawai_id'])->lockForUpdate()->firstOrFail();
+            $pegawai = Pegawai::whereKey($data['pegawai_id'])->lockForUpdate()->firstOrFail();
             $lockedRecord = $record->newQuery()->whereKey($record->getKey())->lockForUpdate()->firstOrFail();
+
+            if (! ($data['golongan_lama_id'] ?? null) && ((int) $lockedRecord->pegawai_id !== (int) $pegawai->getKey() || ! $lockedRecord->golongan_lama_id)) {
+                $data['golongan_lama_id'] = $pegawai->golongan_id;
+            }
+
             $lockedRecord->update($data);
 
             return $lockedRecord;

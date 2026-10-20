@@ -23,6 +23,8 @@ class KenaikanPangkat extends Model
         'golongan_baru_id',
         'periode',
         'tmt',
+        'mk_tahun',
+        'mk_bulan',
         'nomor_sk',
         'tanggal_sk',
         'pejabat_penetap',
@@ -34,6 +36,8 @@ class KenaikanPangkat extends Model
     protected $casts = [
         'tmt' => 'date',
         'tanggal_sk' => 'date',
+        'mk_tahun' => 'integer',
+        'mk_bulan' => 'integer',
     ];
 
     public const STATUSES = [
@@ -46,6 +50,9 @@ class KenaikanPangkat extends Model
     public const JENIS_KP = [
         'reguler' => 'Reguler (4 Tahunan)',
         'pilihan' => 'Pilihan (Jabatan Fungsional)',
+    ];
+
+    private const JENIS_KP_LEGACY = [
         'penyesuaian_ijazah' => 'Penyesuaian Ijazah',
     ];
 
@@ -54,16 +61,19 @@ class KenaikanPangkat extends Model
         static::saving(function (KenaikanPangkat $model): void {
             $model->jenis ??= 'reguler';
             $model->status ??= 'berkas_disiapkan';
+            $model->mk_tahun ??= 0;
+            $model->mk_bulan ??= 0;
 
             if (! $model->pegawai_id) {
                 throw ValidationException::withMessages(['pegawai_id' => 'Pegawai wajib dipilih.']);
             }
 
-            if (! $model->tmt) {
-                throw ValidationException::withMessages(['tmt' => 'TMT kenaikan pangkat wajib diisi.']);
-            }
+            $jenisValid = array_key_exists((string) $model->jenis, self::JENIS_KP)
+                || ($model->exists
+                    && ! $model->isDirty('jenis')
+                    && array_key_exists((string) $model->jenis, self::JENIS_KP_LEGACY));
 
-            if (! array_key_exists((string) $model->jenis, self::JENIS_KP)) {
+            if (! $jenisValid) {
                 throw ValidationException::withMessages(['jenis' => 'Jenis kenaikan pangkat tidak valid.']);
             }
 
@@ -85,19 +95,43 @@ class KenaikanPangkat extends Model
                 throw ValidationException::withMessages(['golongan_baru_id' => 'Golongan baru harus berbeda dari golongan lama.']);
             }
 
-            $date = Carbon::parse($model->tmt)->toDateString();
+            $attributes = $model->getAttributes();
+            if (! preg_match('/^\d+$/D', (string) ($attributes['mk_tahun'] ?? ''))) {
+                throw ValidationException::withMessages(['mk_tahun' => 'Masa kerja tahun harus berupa bilangan bulat.']);
+            }
+            if (! preg_match('/^\d+$/D', (string) ($attributes['mk_bulan'] ?? ''))) {
+                throw ValidationException::withMessages(['mk_bulan' => 'Masa kerja bulan harus berupa bilangan bulat.']);
+            }
+            if ((int) $model->mk_tahun < 0 || (int) $model->mk_tahun > 60) {
+                throw ValidationException::withMessages(['mk_tahun' => 'Masa kerja tahun harus antara 0 dan 60.']);
+            }
+            if ((int) $model->mk_bulan < 0 || (int) $model->mk_bulan > 11) {
+                throw ValidationException::withMessages(['mk_bulan' => 'Masa kerja bulan harus antara 0 dan 11.']);
+            }
+
+            $date = $model->tmt ? Carbon::parse($model->tmt)->toDateString() : null;
+            $integrityKey = static::integrityKey(
+                (int) $model->pegawai_id,
+                (string) $model->jenis,
+                $date,
+                (int) $model->mk_tahun,
+                (int) $model->mk_bulan,
+            );
             $duplicate = static::withTrashed()
-                ->where('pegawai_id', $model->pegawai_id)
-                ->where('jenis', $model->jenis)
-                ->whereDate('tmt', $date)
+                ->where('integrity_key', $integrityKey)
                 ->when($model->exists, fn ($query) => $query->whereKeyNot($model->getKey()))
                 ->exists();
 
             if ($duplicate) {
-                throw ValidationException::withMessages(['tmt' => 'Pengajuan KP dengan pegawai, jenis, dan TMT yang sama sudah ada.']);
+                $field = $date ? 'tmt' : 'mk_tahun';
+                $message = $date
+                    ? 'Pengajuan KP dengan pegawai, jenis, dan TMT yang sama sudah ada.'
+                    : 'Pengajuan KP dengan pegawai, jenis, dan masa kerja yang sama sudah ada.';
+
+                throw ValidationException::withMessages([$field => $message]);
             }
 
-            $model->integrity_key = static::integrityKey((int) $model->pegawai_id, (string) $model->jenis, $date);
+            $model->integrity_key = $integrityKey;
         });
 
         static::saved(function (KenaikanPangkat $model): void {
@@ -119,9 +153,25 @@ class KenaikanPangkat extends Model
         });
     }
 
-    public static function integrityKey(int $pegawaiId, string $jenis, string $tmt): string
+    public static function integrityKey(
+        int $pegawaiId,
+        string $jenis,
+        ?string $tmt = null,
+        int $mkTahun = 0,
+        int $mkBulan = 0,
+    ): string {
+        $period = $tmt
+            ? Carbon::parse($tmt)->toDateString()
+            : "masa-kerja:{$mkTahun}:{$mkBulan}";
+
+        return hash('sha256', implode('|', ['kp', $pegawaiId, $jenis, $period]));
+    }
+
+    public static function jenisLabel(?string $jenis): string
     {
-        return hash('sha256', implode('|', ['kp', $pegawaiId, $jenis, Carbon::parse($tmt)->toDateString()]));
+        return self::JENIS_KP[$jenis]
+            ?? self::JENIS_KP_LEGACY[$jenis]
+            ?? (string) $jenis;
     }
 
     public function pegawai(): BelongsTo

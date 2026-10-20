@@ -9,8 +9,13 @@ use App\Filament\Pages\TuPersonnelExchangePage;
 use App\Filament\Pages\TuSecurityOverview;
 use App\Filament\Resources\AuditLogResource;
 use App\Filament\Resources\GajiBerkalaResource;
+use App\Filament\Resources\KenaikanPangkatResource;
+use App\Filament\Resources\KenaikanPangkatResource\Pages\CreateKenaikanPangkat;
+use App\Filament\Resources\KenaikanPangkatResource\Pages\ListKenaikanPangkats;
 use App\Filament\Resources\LegalisirResource;
 use App\Filament\Resources\PegawaiResource;
+use App\Filament\Resources\PegawaiResource\Pages\CreatePegawai;
+use App\Filament\Resources\PegawaiResource\Pages\ListPegawais;
 use App\Filament\Resources\SuratKeluarResource;
 use App\Filament\Resources\SuratKeluarResource\Pages\ListSuratKeluars;
 use App\Filament\Resources\SuratMasukResource;
@@ -21,6 +26,7 @@ use App\Models\GajiBerkala;
 use App\Models\Legalisir;
 use App\Models\NotificationOutbox;
 use App\Models\Pegawai;
+use App\Models\RefGolongan;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
@@ -28,7 +34,6 @@ use App\Services\TuPersonnelExchange;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Tests\TestCase;
 
@@ -170,30 +175,49 @@ class RoleAuthorizationTest extends TestCase
         $this->get(BackupManager::getUrl())->assertForbidden();
     }
 
-    public function test_form_pegawai_dan_pengguna_memuat_profil_yang_diperluas(): void
+    public function test_form_pegawai_ringkas_dan_form_pengguna_memuat_login_utama(): void
     {
-        Storage::fake('local');
-        $image = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=');
-        Storage::disk('local')->put('profil_pegawai/pegawai.png', $image);
-        Storage::disk('local')->put('profil_pengguna/pengurus.png', $image);
-
         $pegawai = Pegawai::create([
             'nama' => 'Pegawai Uji Profil',
             'status_kepegawaian' => 'PNS',
-            'foto_path' => 'profil_pegawai/pegawai.png',
         ]);
 
         $this->actingAs($this->user(User::ROLE_KEPEGAWAIAN, 'form-kepegawaian@test.com'));
+        $golongan = RefGolongan::create([
+            'kode' => 'III/a',
+            'pangkat' => 'Penata Muda',
+            'tingkat' => 'III',
+            'urutan' => 1,
+        ]);
 
         $this->get(PegawaiResource::getUrl('create'))
             ->assertOk()
-            ->assertSee('Foto Profil Pegawai')
-            ->assertSee('Kontak &amp; Biodata', false)
-            ->assertSee('Tanggal Lahir')
-            ->assertSee('Tanggal Mulai Bertugas');
+            ->assertSee('Nama Lengkap &amp; Gelar', false)
+            ->assertSee('NIP')
+            ->assertSee('Status Kepegawaian')
+            ->assertSee('Golongan / Ruang')
+            ->assertDontSee('Foto Profil Pegawai')
+            ->assertDontSee('Kontak &amp; Biodata', false)
+            ->assertDontSee('Riwayat TMT Terakhir');
+        Livewire::test(CreatePegawai::class)
+            ->fillForm([
+                'nama' => 'Siti Aminah, S.Pd.',
+                'nip' => '198501012010012001',
+                'status_kepegawaian' => 'PNS',
+                'golongan_id' => $golongan->id,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+        $this->assertDatabaseHas('pegawai', [
+            'nama' => 'Siti Aminah, S.Pd.',
+            'nip' => '198501012010012001',
+            'status_kepegawaian' => 'PNS',
+            'golongan_id' => $golongan->id,
+        ]);
         $this->get(PegawaiResource::getUrl('edit', ['record' => $pegawai]))
             ->assertOk()
-            ->assertSee('Preview tersimpan');
+            ->assertSee('Data Inti Pegawai')
+            ->assertDontSee('Preview tersimpan');
 
         $this->flushSession();
         $admin = $this->user(User::ROLE_ADMIN, 'form-admin@test.com');
@@ -209,6 +233,97 @@ class RoleAuthorizationTest extends TestCase
         $this->get(UserResource::getUrl('edit', ['record' => $admin]))
             ->assertOk()
             ->assertSee('Username');
+    }
+
+    public function test_form_kenaikan_pangkat_ringkas_memakai_selector_masa_kerja(): void
+    {
+        $golonganLama = RefGolongan::create([
+            'kode' => 'II/a',
+            'pangkat' => 'Pengatur Muda',
+            'tingkat' => 'II',
+            'urutan' => 1,
+        ]);
+        $golonganBaru = RefGolongan::create([
+            'kode' => 'II/b',
+            'pangkat' => 'Pengatur Muda Tk. I',
+            'tingkat' => 'II',
+            'urutan' => 2,
+        ]);
+        $pegawai = Pegawai::create([
+            'nama' => 'Pegawai Pengajuan KP',
+            'status_kepegawaian' => 'PNS',
+            'golongan_id' => $golonganLama->id,
+        ]);
+
+        $this->actingAs($this->user(User::ROLE_KEPEGAWAIAN, 'form-kp@test.com'));
+
+        $this->get(KenaikanPangkatResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Pegawai yang Mengajukan')
+            ->assertSee('Jenis Kenaikan Pangkat')
+            ->assertSee('Golongan Lama')
+            ->assertSee('Golongan Baru (Tujuan)')
+            ->assertSee('Masa Kerja (Tahun)')
+            ->assertSee('Masa Kerja (Bulan)')
+            ->assertDontSee('Penyesuaian Ijazah')
+            ->assertDontSee('Periode Pengajuan')
+            ->assertDontSee('TMT Kenaikan Pangkat')
+            ->assertDontSee('Nomor SK')
+            ->assertDontSee('Tanggal SK')
+            ->assertDontSee('Pejabat Penetap');
+
+        Livewire::test(CreateKenaikanPangkat::class)
+            ->fillForm([
+                'pegawai_id' => $pegawai->id,
+                'jenis' => 'reguler',
+                'golongan_baru_id' => $golonganBaru->id,
+                'mk_tahun' => 8,
+                'mk_bulan' => 6,
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('kenaikan_pangkat', [
+            'pegawai_id' => $pegawai->id,
+            'golongan_lama_id' => $golonganLama->id,
+            'golongan_baru_id' => $golonganBaru->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 6,
+            'tmt' => null,
+            'periode' => null,
+            'nomor_sk' => null,
+            'status' => 'berkas_disiapkan',
+        ]);
+    }
+
+    public function test_tabel_kepegawaian_mengikuti_input_baru(): void
+    {
+        $this->actingAs($this->user(User::ROLE_KEPEGAWAIAN, 'tabel-pegawai@test.com'));
+
+        Livewire::test(ListPegawais::class)
+            ->assertTableColumnExists('mobile_summary')
+            ->assertTableColumnExists('nama')
+            ->assertTableColumnExists('status_kepegawaian')
+            ->assertTableColumnExists('golongan.kode')
+            ->assertTableColumnDoesNotExist('foto_path')
+            ->assertTableColumnDoesNotExist('jabatan')
+            ->assertTableColumnDoesNotExist('nomor_telepon')
+            ->assertTableColumnDoesNotExist('tmt_pangkat_terakhir')
+            ->assertTableColumnDoesNotExist('perkiraan_kp_berikutnya')
+            ->assertTableColumnDoesNotExist('perkiraan_kgb_berikutnya')
+            ->assertTableColumnDoesNotExist('is_active');
+
+        Livewire::test(ListKenaikanPangkats::class)
+            ->assertTableColumnExists('mobile_summary')
+            ->assertTableColumnExists('pegawai.nama')
+            ->assertTableColumnExists('jenis')
+            ->assertTableColumnExists('golonganLama.kode')
+            ->assertTableColumnExists('golonganBaru.kode')
+            ->assertTableColumnExists('masa_kerja')
+            ->assertTableColumnExists('status')
+            ->assertTableColumnDoesNotExist('periode')
+            ->assertTableColumnDoesNotExist('tmt')
+            ->assertTableColumnDoesNotExist('nomor_sk');
     }
 
     public function test_administrator_sistem_hanya_dapat_membaca_persuratan_dan_legalisir(): void

@@ -12,7 +12,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
@@ -44,21 +43,18 @@ class KenaikanPangkatResource extends Resource
                 Forms\Components\Section::make('Pegawai & Pengajuan')
                     ->schema([
                         Forms\Components\Select::make('pegawai_id')
-                            ->label('Nama Pegawai')
+                            ->label('Pegawai yang Mengajukan')
                             ->relationship('pegawai', 'nama')
                             ->getOptionLabelFromRecordUsing(fn (Pegawai $record) => "{$record->nama} - ".($record->nip ?: 'Non-NIP')." ({$record->golongan?->kode})")
                             ->searchable()
                             ->preload()
-                            ->required()
                             ->reactive()
-                            ->afterStateUpdated(function ($state, callable $set) {
+                            ->afterStateUpdated(function ($state, callable $set): void {
                                 if ($state) {
-                                    $pegawai = Pegawai::find($state);
-                                    if ($pegawai && $pegawai->golongan_id) {
-                                        $set('golongan_lama_id', $pegawai->golongan_id);
-                                    }
+                                    $set('golongan_lama_id', Pegawai::find($state)?->golongan_id);
                                 }
-                            }),
+                            })
+                            ->required(),
 
                         Forms\Components\Select::make('jenis')
                             ->label('Jenis Kenaikan Pangkat')
@@ -81,49 +77,25 @@ class KenaikanPangkatResource extends Resource
                             ->preload()
                             ->required(),
 
-                        Forms\Components\TextInput::make('periode')
-                            ->label('Periode Pengajuan')
-                            ->placeholder('Contoh: 2026-04')
-                            ->regex('/^\d{4}-(0[1-9]|1[0-2])$/')
-                            ->maxLength(7)
-                            ->default(fn () => date('Y-m')),
-
-                        Forms\Components\DatePicker::make('tmt')
-                            ->label('TMT Kenaikan Pangkat')
+                        Forms\Components\Select::make('mk_tahun')
+                            ->label('Masa Kerja (Tahun)')
+                            ->options(array_combine(
+                                range(0, 60),
+                                array_map(fn (int $year): string => "{$year} tahun", range(0, 60)),
+                            ))
+                            ->default(0)
                             ->required()
-                            ->displayFormat('d/m/Y'),
-                    ])->columns(2),
+                            ->native(false),
 
-                Forms\Components\Section::make('Status & Dokumen SK')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\Select::make('status')
-                            ->label('Status Alur Proses')
-                            ->options(KenaikanPangkat::STATUSES)
-                            ->default('berkas_disiapkan')
-                            ->required(),
-
-                        Forms\Components\TextInput::make('nomor_sk')
-                            ->label('Nomor SK Kenaikan Pangkat')
-                            ->placeholder('Diisi jika SK sudah terbit')
-                            ->maxLength(100),
-
-                        Forms\Components\DatePicker::make('tanggal_sk')
-                            ->label('Tanggal SK')
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\TextInput::make('pejabat_penetap')
-                            ->label('Pejabat Penetap')
-                            ->placeholder('Contoh: Gubernur, Kepala BKD, Kepala Disdik')
-                            ->maxLength(150),
-
-                        Forms\Components\Textarea::make('catatan')
-                            ->label('Catatan / Checklist Kelengkapan Berkas')
-                            ->placeholder('Contoh: SKP 2 tahun terakhir lengkap, PAK sudah diverifikasi...')
-                            ->rows(3)
-                            ->maxLength(20000)
-                            ->columnSpanFull(),
+                        Forms\Components\Select::make('mk_bulan')
+                            ->label('Masa Kerja (Bulan)')
+                            ->options(array_combine(
+                                range(0, 11),
+                                array_map(fn (int $month): string => "{$month} bulan", range(0, 11)),
+                            ))
+                            ->default(0)
+                            ->required()
+                            ->native(false),
                     ])->columns(2),
             ]);
     }
@@ -137,9 +109,9 @@ class KenaikanPangkatResource extends Resource
                     ->state(fn (KenaikanPangkat $record): string => $record->pegawai?->nama ?: 'Pegawai tidak tersedia')
                     ->description(fn (KenaikanPangkat $record): string => collect([
                         $record->pegawai?->nip ?: 'Non-NIP',
-                        KenaikanPangkat::JENIS_KP[$record->jenis] ?? $record->jenis,
+                        KenaikanPangkat::jenisLabel($record->jenis),
                         collect([$record->golonganLama?->kode, $record->golonganBaru?->kode])->filter()->implode(' → '),
-                        $record->tmt?->translatedFormat('d M Y'),
+                        "Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln",
                         KenaikanPangkat::STATUSES[$record->status] ?? $record->status,
                     ])->filter()->implode(' · '))
                     ->weight('bold')
@@ -162,7 +134,7 @@ class KenaikanPangkatResource extends Resource
                         'success' => 'pilihan',
                         'warning' => 'penyesuaian_ijazah',
                     ])
-                    ->formatStateUsing(fn ($state) => KenaikanPangkat::JENIS_KP[$state] ?? $state)
+                    ->formatStateUsing(fn ($state) => KenaikanPangkat::jenisLabel($state))
                     ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('golonganLama.kode')
@@ -177,15 +149,9 @@ class KenaikanPangkatResource extends Resource
                     ->color('success')
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('periode')
-                    ->label('Periode')
-                    ->sortable()
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('tmt')
-                    ->label('TMT')
-                    ->date('d M Y')
-                    ->sortable()
+                Tables\Columns\TextColumn::make('masa_kerja')
+                    ->label('Masa Kerja')
+                    ->state(fn (KenaikanPangkat $record): string => "{$record->mk_tahun} Thn {$record->mk_bulan} Bln")
                     ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
@@ -200,12 +166,6 @@ class KenaikanPangkatResource extends Resource
                     ->sortable()
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('nomor_sk')
-                    ->label('Nomor SK')
-                    ->searchable()
-                    ->placeholder('Belum terbit')
-                    ->limit(25)
-                    ->visibleFrom('md'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
@@ -219,16 +179,6 @@ class KenaikanPangkatResource extends Resource
                 Tables\Filters\SelectFilter::make('golongan_baru_id')
                     ->label('Golongan Baru')
                     ->relationship('golonganBaru', 'kode'),
-
-                Tables\Filters\Filter::make('periode')
-                    ->form([
-                        Forms\Components\TextInput::make('periode_tahun')
-                            ->label('Tahun / Periode')
-                            ->placeholder('2026'),
-                    ])
-                    ->query(function (Builder $query, array $data) {
-                        return $query->when($data['periode_tahun'], fn ($q, $t) => $q->where('periode', 'like', "%{$t}%"));
-                    }),
 
                 Tables\Filters\TrashedFilter::make(),
             ])
@@ -246,10 +196,6 @@ class KenaikanPangkatResource extends Resource
                                 ->label('Status Baru')
                                 ->options(KenaikanPangkat::STATUSES)
                                 ->required(),
-                            Forms\Components\TextInput::make('nomor_sk')
-                                ->label('Nomor SK (Jika Terbit)'),
-                            Forms\Components\DatePicker::make('tanggal_sk')
-                                ->label('Tanggal SK'),
                         ])
                         ->action(function (KenaikanPangkat $record, array $data) {
                             static::authorizeResourceAction('transition');
@@ -278,7 +224,7 @@ class KenaikanPangkatResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Periode', 'TMT', 'Nomor SK', 'Tanggal SK', 'Status']);
+                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Status']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->pegawai?->nip,
@@ -286,10 +232,8 @@ class KenaikanPangkatResource extends Resource
                                         $row->jenis,
                                         $row->golonganLama?->kode,
                                         $row->golonganBaru?->kode,
-                                        $row->periode,
-                                        $row->tmt?->format('Y-m-d'),
-                                        $row->nomor_sk,
-                                        $row->tanggal_sk?->format('Y-m-d'),
+                                        $row->mk_tahun,
+                                        $row->mk_bulan,
                                         $row->status,
                                     ]);
                                 }
