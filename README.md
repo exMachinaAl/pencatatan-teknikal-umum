@@ -53,6 +53,11 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
   4. Deteksi dan pencegahan data duplikat secara otomatis.
   5. Pencatatan log impor ke tabel `import_gform_log`.
 
+### 8. Lampiran Langsung dan Tautan Google
+* Lampiran privat Surat Masuk, Surat Keluar, dan Legalisir dapat dibuka langsung dari kolom **Lampiran** pada tabel tanpa masuk ke halaman detail.
+* Form dokumen menerima tautan HTTPS Google Drive, Google Sheets, Google Form, atau penyedia lampiran lain. Tautan ditampilkan berdampingan dengan berkas lokal jika keduanya tersedia.
+* Berkas lokal tetap melewati otorisasi aplikasi dan dicatat pada log akses. Hak akses tautan Google mengikuti pengaturan berbagi pada Google Drive; gunakan pembatasan akun organisasi untuk dokumen sensitif.
+
 ### 8. Audit Log & Keamanan
 * Pencatatan otomatis riwayat aksi `create`, `update`, `delete`, `restore`, dan `import` menggunakan Model Observers.
 * Merekam identitas pengguna, IP address, waktu, serta perbandingan data sebelum dan sesudah perubahan (kata sandi dikecualikan dari log).
@@ -69,13 +74,15 @@ Seeder membuat lima akun lokal berikut. Administrator Sistem berada di Divisi IT
 
 > Password awal dibaca dari variabel `TU_*_INITIAL_PASSWORD` di `.env`. Seeder tidak akan menimpa password, role, atau status akun yang sudah ada.
 
-| Peran (Role) | Email Login | Kata Sandi | Hak Akses Utama |
-|---|---|---|---|
-| **Administrator Sistem / Fasilitator TI** | `admin@tu.sekolah.sch.id` | `.env` | Divisi IT: kelola pengguna, pengaturan, backup, audit teknis, dan pemantauan baca-saja. Bukan pelaksana atau pimpinan TU. |
-| **Kepala Tata Usaha** | `kepala.tu@tu.sekolah.sch.id` | `.env` | Pimpinan operasional tertinggi TU dengan akses seluruh modul kerja TU dan audit. |
-| **Kepala Sekolah** | `kepala@tu.sekolah.sch.id` | `.env` | Baca modul operasional dan cetak bukti legalisir; tidak mengubah record langsung. |
-| **Petugas TU** | `staf@tu.sekolah.sch.id` | `.env` | Operasional surat masuk/keluar dan legalisir, termasuk impor/ekspor yang diizinkan. |
-| **Pegawai / Guru** | `pegawai@tu.sekolah.sch.id` | `.env` | Akses panel dasar; portal record pribadi belum dibuka sampai relasi kepemilikan data tersedia. |
+| Peran (Role) | Username | Email Lama | Kata Sandi | Hak Akses Utama |
+|---|---|---|---|---|
+| **Administrator Sistem / Fasilitator TI** | `admin` | `admin@tu.sekolah.sch.id` | `.env` | Divisi IT: kelola pengguna, pengaturan, backup, audit teknis, dan pemantauan baca-saja. Bukan pelaksana atau pimpinan TU. |
+| **Kepala Tata Usaha** | `kepala_tu` | `kepala.tu@tu.sekolah.sch.id` | `.env` | Pimpinan operasional tertinggi TU dengan akses seluruh modul kerja TU dan audit. |
+| **Kepala Sekolah** | `kepala_sekolah` | `kepala@tu.sekolah.sch.id` | `.env` | Baca modul operasional dan cetak bukti legalisir; tidak mengubah record langsung. |
+| **Petugas TU** | `staf_tu` | `staf@tu.sekolah.sch.id` | `.env` | Operasional surat masuk/keluar dan legalisir, termasuk impor/ekspor yang diizinkan. |
+| **Pegawai / Guru** | `pegawai` | `pegawai@tu.sekolah.sch.id` | `.env` | Akses panel dasar; portal record pribadi belum dibuka sampai relasi kepemilikan data tersedia. |
+
+Portal menerima username, NIP dari data pegawai yang dihubungkan ke akun, atau email lama. Untuk instalasi skala pribadi, email akun boleh dikosongkan.
 
 ---
 
@@ -143,6 +150,6 @@ mysql -u root -p tata_usaha_db < storage/app/backups/backup-tata_usaha_db-YYYY-M
 ## 📋 Catatan Risiko & Validasi Lanjutan dengan Pihak TU Sekolah
 
 1. **Nomor Surat Dinas**: Nomor surat keluar diisi manual sesuai nomor resmi yang telah ditetapkan sekolah. Sistem memeriksa keunikannya dan tidak membuat nomor baru atas nama sekolah.
-2. **Keterhubungan Google Form**: Jalur impor CSV saat ini telah dilengkapi pencegahan data ganda. Bila volume pengiriman surat eksternal atau legalisir alumni sangat tinggi di masa mendatang, dapat dihubungkan webhook Google Apps Script langsung ke endpoint API internal.
+2. **Keterhubungan Google Form**: Jalur impor CSV dan tautan langsung Google Drive/Sheets telah tersedia. Sinkronisasi otomatis dua arah belum memakai Google API; bila volume data meningkat, integrasi dapat dilanjutkan melalui Google Apps Script atau service account ke endpoint API internal.
 3. **Penyimpanan Berkas Digital**: Berkas pindaian surat dan ijazah disimpan pada disk privat `storage/app/` demi menjaga kerahasiaan dokumen dinas sekolah sesuai UU Perlindungan Data Pribadi (UU PDP).
 # pencatatan-teknikal-umum
