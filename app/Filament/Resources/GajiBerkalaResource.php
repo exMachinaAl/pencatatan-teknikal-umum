@@ -14,7 +14,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
@@ -51,7 +50,7 @@ class GajiBerkalaResource extends Resource
                         Forms\Components\Select::make('pegawai_id')
                             ->label('Nama Pegawai')
                             ->relationship('pegawai', 'nama')
-                            ->getOptionLabelFromRecordUsing(fn (Pegawai $record) => "{$record->nama} - " . ($record->nip ?: 'Non-NIP') . " ({$record->golongan?->kode})")
+                            ->getOptionLabelFromRecordUsing(fn (Pegawai $record) => "{$record->nama} - ".($record->nip ?: 'Non-NIP')." ({$record->golongan?->kode})")
                             ->searchable()
                             ->preload()
                             ->required()
@@ -168,44 +167,72 @@ class GajiBerkalaResource extends Resource
 
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (GajiBerkala $record): string => $record->pegawai?->nama ?: 'Pegawai tidak tersedia')
+                    ->description(fn (GajiBerkala $record): string => collect([
+                        $record->pegawai?->nip ?: 'Non-NIP',
+                        $record->golongan?->kode ? "Gol. {$record->golongan->kode}" : null,
+                        $record->tmt_berikutnya ? 'Berikutnya '.$record->tmt_berikutnya->translatedFormat('d M Y') : null,
+                        $canViewSalary && $record->gaji_pokok_baru
+                            ? 'Rp '.number_format($record->gaji_pokok_baru, 0, ',', '.')
+                            : null,
+                        GajiBerkala::STATUSES[$record->status] ?? $record->status,
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('pegawai.nama')
                     ->label('Nama Pegawai')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (GajiBerkala $record) => $record->pegawai?->nip ?: '-'),
+                    ->description(fn (GajiBerkala $record) => $record->pegawai?->nip ?: '-')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('golongan.kode')
                     ->label('Gol/Ruang')
                     ->badge()
-                    ->color('info'),
+                    ->color('info')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tmt')
                     ->label('TMT KGB')
                     ->date('d M Y')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tmt_berikutnya')
                     ->label('TMT Berikutnya')
                     ->date('d M Y')
                     ->badge()
                     ->color(function (GajiBerkala $record) {
-                        if (! $record->tmt_berikutnya) return 'gray';
+                        if (! $record->tmt_berikutnya) {
+                            return 'gray';
+                        }
                         $diff = now()->diffInMonths($record->tmt_berikutnya, false);
+
                         return ($diff <= 3 && $diff >= -1) ? 'danger' : 'success';
                     })
                     ->description(function (GajiBerkala $record) {
-                        if (! $record->tmt_berikutnya) return null;
+                        if (! $record->tmt_berikutnya) {
+                            return null;
+                        }
                         if ($record->tmt_berikutnya->lte(now()->addMonths(3))) {
                             return '⚡ Jatuh Tempo';
                         }
+
                         return null;
                     })
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('masa_kerja')
                     ->label('Masa Kerja')
-                    ->state(fn (GajiBerkala $record) => "{$record->mk_tahun} Thn {$record->mk_bulan} Bln"),
+                    ->state(fn (GajiBerkala $record) => "{$record->mk_tahun} Thn {$record->mk_bulan} Bln")
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('gaji_pokok_baru')
                     ->label('Gaji Pokok Baru')
@@ -213,9 +240,11 @@ class GajiBerkalaResource extends Resource
                         if (! $canViewSalary) {
                             return '•••••••• (Terselubung)';
                         }
-                        return $record->gaji_pokok_baru ? 'Rp ' . number_format($record->gaji_pokok_baru, 0, ',', '.') : '-';
+
+                        return $record->gaji_pokok_baru ? 'Rp '.number_format($record->gaji_pokok_baru, 0, ',', '.') : '-';
                     })
-                    ->color($canViewSalary ? 'success' : 'gray'),
+                    ->color($canViewSalary ? 'success' : 'gray')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status')
@@ -224,13 +253,15 @@ class GajiBerkalaResource extends Resource
                         'info' => 'sk_terbit',
                         'success' => 'diserahkan',
                     ])
-                    ->formatStateUsing(fn ($state) => GajiBerkala::STATUSES[$state] ?? $state),
+                    ->formatStateUsing(fn ($state) => GajiBerkala::STATUSES[$state] ?? $state)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('nomor_sk')
                     ->label('Nomor SK')
                     ->searchable()
                     ->placeholder('-')
-                    ->limit(20),
+                    ->limit(20)
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 Tables\Filters\Filter::make('perlu_tindak_lanjut')
@@ -284,7 +315,7 @@ class GajiBerkalaResource extends Resource
                             static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="gaji-berkala-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="gaji-berkala-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records, $canViewSalary) {

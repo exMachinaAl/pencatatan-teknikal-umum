@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Auth\Login;
+use App\Models\Pegawai;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -20,7 +21,7 @@ class LoginTest extends TestCase
         $response->assertStatus(200);
         $response->assertSee('Sistem Informasi Tata Usaha');
         $response->assertSee('Masuk ke ruang kerja');
-        $response->assertSee('Alamat email');
+        $response->assertSee('Username atau NIP');
         $response->assertSee('Kata sandi');
         $response->assertSee('Hubungi administrator sekolah.');
     }
@@ -29,12 +30,12 @@ class LoginTest extends TestCase
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $user = User::create([
-            'name' => 'Operator', 'email' => 'operator@test.com',
+            'name' => 'Operator', 'username' => 'operator',
             'password' => 'password', 'role' => User::ROLE_PETUGAS_TU, 'is_active' => true,
         ]);
 
         Livewire::test(Login::class)
-            ->fillForm(['email' => $user->email, 'password' => 'password'])
+            ->fillForm(['login' => 'OPERATOR', 'password' => 'password'])
             ->call('authenticate')
             ->assertHasNoFormErrors()
             ->assertRedirect();
@@ -46,23 +47,23 @@ class LoginTest extends TestCase
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $user = User::create([
-            'name' => 'Operator', 'email' => 'operator@test.com',
+            'name' => 'Operator', 'username' => 'operator', 'email' => 'operator@test.com',
             'password' => 'password', 'role' => User::ROLE_PETUGAS_TU, 'is_active' => true,
         ]);
 
         Livewire::test(Login::class)
-            ->fillForm(['email' => $user->email, 'password' => 'salah'])
+            ->fillForm(['login' => $user->username, 'password' => 'salah'])
             ->call('authenticate')
-            ->assertHasFormErrors(['email'])
+            ->assertHasFormErrors(['login'])
             ->assertSee('Tidak dapat masuk.');
 
         $this->assertGuest();
         $user->update(['is_active' => false]);
 
         Livewire::test(Login::class)
-            ->fillForm(['email' => $user->email, 'password' => 'password'])
+            ->fillForm(['login' => $user->username, 'password' => 'password'])
             ->call('authenticate')
-            ->assertHasFormErrors(['email'])
+            ->assertHasFormErrors(['login'])
             ->assertSee('Tidak dapat masuk.');
 
         $this->assertGuest();
@@ -73,17 +74,53 @@ class LoginTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(Login::class)
-            ->fillForm(['email' => '', 'password' => ''])
+            ->fillForm(['login' => '', 'password' => ''])
             ->call('authenticate')
-            ->assertHasFormErrors(['email' => 'required', 'password' => 'required'])
-            ->assertSee('Masukkan alamat email Anda.')
+            ->assertHasFormErrors(['login' => 'required', 'password' => 'required'])
+            ->assertSee('Masukkan username, NIP, atau email Anda.')
             ->assertSee('Masukkan kata sandi Anda.');
+    }
+
+    public function test_form_login_menerima_nip_pegawai_dan_email_lama(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $pegawai = Pegawai::create([
+            'nip' => '198001012005011001',
+            'nama' => 'Operator Ber-NIP',
+            'status_kepegawaian' => 'PNS',
+        ]);
+        $user = User::create([
+            'pegawai_id' => $pegawai->id,
+            'name' => 'Operator Ber-NIP',
+            'username' => 'operator.nip',
+            'email' => 'operator.nip@test.com',
+            'password' => 'password',
+            'role' => User::ROLE_PETUGAS_TU,
+            'is_active' => true,
+        ]);
+
+        Livewire::test(Login::class)
+            ->fillForm(['login' => '198001012005011001', 'password' => 'password'])
+            ->call('authenticate')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+        $this->assertAuthenticatedAs($user);
+
+        auth()->logout();
+
+        Livewire::test(Login::class)
+            ->fillForm(['login' => 'OPERATOR.NIP@TEST.COM', 'password' => 'password'])
+            ->call('authenticate')
+            ->assertHasNoFormErrors()
+            ->assertRedirect();
+        $this->assertAuthenticatedAs($user);
     }
 
     public function test_admin_bisa_login(): void
     {
         $user = User::create([
             'name' => 'Operator TU',
+            'username' => 'admin',
             'email' => 'admin@tu.sekolah.sch.id',
             'password' => bcrypt('password'),
             'role' => 'admin',

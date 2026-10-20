@@ -51,6 +51,7 @@ class Legalisir extends Model
         'catatan',
         'alasan_penolakan',
         'file_dokumen_path',
+        'tautan_lampiran',
     ];
 
     protected $casts = [

@@ -7,6 +7,7 @@ use App\Filament\Resources\AuditLogResource\Pages\ListAuditLogs;
 use App\Filament\Resources\GajiBerkalaResource\Pages\ListGajiBerkalas;
 use App\Filament\Resources\KenaikanPangkatResource\Pages\ListKenaikanPangkats;
 use App\Filament\Resources\LegalisirResource\Pages\ListLegalisirs;
+use App\Filament\Resources\NotificationOutboxResource\Pages\ListNotificationOutboxes;
 use App\Filament\Resources\PegawaiResource\Pages\ListPegawais;
 use App\Filament\Resources\SuratKeluarResource\Pages\ListSuratKeluars;
 use App\Filament\Resources\SuratMasukResource\Pages\ListSuratMasuks;
@@ -34,6 +35,7 @@ class NavigationReliabilityTest extends TestCase
                 ListSuratMasuks::class,
                 ListSuratKeluars::class,
                 ListLegalisirs::class,
+                ListNotificationOutboxes::class,
             ],
             User::ROLE_KEPEGAWAIAN => [
                 ListPegawais::class,

@@ -114,9 +114,10 @@ class SuratKeluarResource extends Resource
                             ->columnSpanFull(),
 
                         Forms\Components\TextInput::make('tautan_gform')
-                            ->label('Tautan Google Drive / Google Form')
-                            ->placeholder('https://drive.google.com/...')
+                            ->label('Tautan Google Drive / Sheets / Lampiran')
+                            ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
                             ->url()
+                            ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
                             ->columnSpanFull(),
                     ])->columns(2),
 
@@ -161,17 +162,34 @@ class SuratKeluarResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ViewColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->view('filament.tables.columns.document-mobile-summary', fn (SuratKeluar $record): array => [
+                        'title' => $record->perihal,
+                        'meta' => collect([
+                            $record->nomor_surat ?: 'Tanpa nomor',
+                            $record->tujuan,
+                            $record->tanggal_surat?->translatedFormat('d M Y'),
+                            SuratKeluar::STATUSES[$record->status] ?? $record->status,
+                        ])->filter()->implode(' · '),
+                        'externalAttribute' => 'tautan_gform',
+                    ])
+                    ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('nomor_surat')
                     ->label('Nomor Surat')
                     ->searchable()
                     ->sortable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('perihal')
                     ->label('Perihal')
                     ->searchable()
                     ->limit(48)
-                    ->wrap(),
+                    ->wrap()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tujuan')
                     ->label('Tujuan')
@@ -179,7 +197,8 @@ class SuratKeluarResource extends Resource
                     ->weight('semibold')
                     ->limit(28)
                     ->wrap()
-                    ->description(fn (SuratKeluar $record) => $record->tanggal_surat?->translatedFormat('d M Y')),
+                    ->description(fn (SuratKeluar $record) => $record->tanggal_surat?->translatedFormat('d M Y'))
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('sifat')
                     ->label('Sifat')
@@ -189,7 +208,8 @@ class SuratKeluarResource extends Resource
                         'danger' => 'segera',
                         'primary' => 'rahasia',
                     ])
-                    ->formatStateUsing(fn ($state) => SuratKeluar::SIFAT[$state] ?? $state),
+                    ->formatStateUsing(fn ($state) => SuratKeluar::SIFAT[$state] ?? $state)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status')
@@ -199,16 +219,16 @@ class SuratKeluarResource extends Resource
                         'gray' => 'diarsipkan',
                     ])
                     ->formatStateUsing(fn ($state) => SuratKeluar::STATUSES[$state] ?? $state)
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
-                Tables\Columns\IconColumn::make('file_final_path')
-                    ->label('File Final')
-                    ->boolean()
-                    ->trueIcon('heroicon-o-document-check')
-                    ->falseIcon('heroicon-o-minus')
-                    ->color(fn ($state) => $state ? 'success' : 'gray')
-                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\ViewColumn::make('document_links')
+                    ->label('Lampiran')
+                    ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_gform'])
+                    ->extraCellAttributes(['class' => 'tu-document-cell'])
+                    ->visibleFrom('md'),
             ])
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
             ->defaultSort('tanggal_surat', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')

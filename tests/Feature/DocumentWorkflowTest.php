@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\GlobalDocumentSearch;
+use App\Filament\Resources\SuratMasukResource\Pages\ListSuratMasuks;
 use App\Models\AuditLog;
 use App\Models\Disposisi;
 use App\Models\Lampiran;
@@ -12,6 +13,7 @@ use App\Models\NotificationOutbox;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
+use App\Support\DocumentAttachmentLink;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
@@ -187,6 +189,37 @@ class DocumentWorkflowTest extends TestCase
         $this->get(route('lampiran.preview', $lampiran))->assertForbidden();
         $this->get(route('profil.pengguna.foto', $kepalaTu))->assertForbidden();
         $this->get(route('profil.pegawai.foto', $pegawai))->assertForbidden();
+    }
+
+    public function test_lampiran_dan_tautan_google_dapat_dibuka_dari_tabel(): void
+    {
+        Storage::fake('local');
+        $this->actingAs($this->user());
+        Storage::disk('local')->put('arsip_surat_masuk/tabel.pdf', 'dokumen tabel');
+
+        $local = SuratMasuk::create([
+            'tanggal_diterima' => now(),
+            'pengirim' => 'Dinas Pendidikan',
+            'perihal' => 'Surat dengan file lokal',
+            'file_path' => 'arsip_surat_masuk/tabel.pdf',
+        ]);
+        SuratMasuk::create([
+            'tanggal_diterima' => now(),
+            'pengirim' => 'Kecamatan',
+            'perihal' => 'Surat dengan Google Sheets',
+            'tautan_gform' => 'https://docs.google.com/spreadsheets/d/contoh/edit',
+        ]);
+
+        $localLinks = DocumentAttachmentLink::links($local->fresh(), $local->tautan_gform);
+        $this->assertSame('Lihat file', $localLinks[0]['label']);
+        $this->assertStringContainsString('/lampiran/', $localLinks[0]['url']);
+        $this->assertCount(1, DocumentAttachmentLink::links($local->fresh(['lampiran']), 'http://example.test/tidak-aman'));
+
+        Livewire::test(ListSuratMasuks::class)
+            ->assertSee('Lihat file')
+            ->assertSee('Google Sheets')
+            ->assertSee('Surat dengan file lokal')
+            ->assertSee('Surat dengan Google Sheets');
     }
 
     public function test_pencarian_terpadu_mencari_nomor_pengirim_tujuan_perihal_dan_pemohon(): void

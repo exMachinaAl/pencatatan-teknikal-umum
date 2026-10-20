@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\UserResource\Pages;
+use App\Models\Pegawai;
 use App\Models\User;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -12,8 +13,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\HtmlString;
 
 class UserResource extends Resource
 {
@@ -54,74 +53,32 @@ class UserResource extends Resource
                             ->required()
                             ->maxLength(120),
 
+                        Forms\Components\TextInput::make('username')
+                            ->label('Username')
+                            ->required()
+                            ->minLength(3)
+                            ->maxLength(50)
+                            ->regex('/^[a-zA-Z0-9][a-zA-Z0-9._-]{2,49}$/')
+                            ->unique(ignoreRecord: true)
+                            ->helperText('Dipakai untuk login. Contoh: admin, kepala_tu, atau staf.tu.'),
+
                         Forms\Components\TextInput::make('email')
-                            ->label('Alamat Email')
+                            ->label('Email (opsional)')
                             ->email()
                             ->rule('not_regex:/[\r\n]/')
-                            ->required()
                             ->unique(ignoreRecord: true)
-                            ->maxLength(160),
-
-                        Forms\Components\TextInput::make('nomor_telepon')
-                            ->label('Nomor Telepon / WhatsApp')
-                            ->tel()
-                            ->rule('regex:/^[0-9+().\-\s]{6,30}$/')
-                            ->maxLength(30),
-
-                        Forms\Components\TextInput::make('jabatan')
-                            ->label('Jabatan Organisasi')
-                            ->placeholder('Contoh: Kepala TU, Administrator Infrastruktur')
-                            ->maxLength(120),
-
-                        Forms\Components\TextInput::make('unit_kerja')
-                            ->label('Unit / Divisi')
-                            ->placeholder('Contoh: Tata Usaha, Divisi IT')
-                            ->maxLength(120),
+                            ->maxLength(160)
+                            ->helperText('Tetap dapat dipakai untuk login jika diisi.'),
 
                         Forms\Components\Select::make('pegawai_id')
-                            ->label('Terhubung ke Data Pegawai')
+                            ->label('NIP pegawai (opsional)')
                             ->relationship('pegawai', 'nama')
-                            ->searchable()
+                            ->getOptionLabelFromRecordUsing(fn (Pegawai $record): string => ($record->nip ? $record->nip.' — ' : '').$record->nama)
+                            ->searchable(['nip', 'nama'])
                             ->preload()
                             ->unique(ignoreRecord: true)
-                            ->helperText('Opsional. Hubungkan akun dengan satu data pegawai yang sama.'),
+                            ->helperText('Jika dipilih, NIP pegawai juga dapat dipakai untuk login.'),
                     ])->columns(2),
-
-                Forms\Components\Section::make('Foto profil')
-                    ->description('Foto ditampilkan sebagai avatar dan tetap disimpan di penyimpanan privat.')
-                    ->schema([
-                        Forms\Components\FileUpload::make('foto_path')
-                            ->label('Foto Pengurus / Pengguna')
-                            ->disk('local')
-                            ->directory('profil_pengguna')
-                            ->visibility('private')
-                            ->image()
-                            ->imageEditor()
-                            ->imagePreviewHeight('180')
-                            ->acceptedFileTypes(['image/jpeg', 'image/png', 'image/webp'])
-                            ->maxSize(2048)
-                            ->getUploadedFileUsing(function (?User $record, string $file): ?array {
-                                $storage = Storage::disk('local');
-
-                                if (! $record || ! $storage->exists($file)) {
-                                    return null;
-                                }
-
-                                return [
-                                    'name' => basename($file),
-                                    'size' => $storage->size($file),
-                                    'type' => $storage->mimeType($file),
-                                    'url' => route('profil.pengguna.foto', $record),
-                                ];
-                            }),
-
-                        Forms\Components\Placeholder::make('foto_saat_ini')
-                            ->label('Preview tersimpan')
-                            ->content(fn (?User $record): HtmlString|string => $record?->foto_path
-                                ? new HtmlString('<img src="'.e(route('profil.pengguna.foto', $record)).'" alt="Foto profil" style="width:8rem;height:8rem;object-fit:cover;border-radius:9999px;border:1px solid #64748b">')
-                                : 'Belum ada foto profil.')
-                            ->visible(fn (?User $record): bool => $record !== null),
-                    ])->columns(2)->collapsible(),
 
                 Forms\Components\Section::make('Peran dan status')
                     ->description('Akses modul ditentukan oleh peran. Pengguna tidak dapat mengubah perannya sendiri.')
@@ -165,34 +122,44 @@ class UserResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\ImageColumn::make('foto_path')
-                    ->label('Foto')
-                    ->getStateUsing(fn (User $record): ?string => $record->foto_path ? route('profil.pengguna.foto', $record) : null)
-                    ->circular()
-                    ->height(40),
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (User $record): string => $record->name)
+                    ->description(fn (User $record): string => collect([
+                        '@'.($record->username ?: '-'),
+                        $record->pegawai?->nip ? 'NIP '.$record->pegawai->nip : null,
+                        User::ROLE_LABELS[$record->role] ?? $record->role,
+                        $record->is_active ? 'Aktif' : 'Nonaktif',
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
 
                 Tables\Columns\TextColumn::make('nomor')
                     ->label('No.')
-                    ->rowIndex(),
+                    ->rowIndex()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nama Pengguna')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (User $record): string => $record->email),
+                    ->description(fn (User $record): string => '@'.($record->username ?: '-').($record->pegawai?->nip ? ' · NIP '.$record->pegawai->nip : ''))
+                    ->visibleFrom('md'),
+
+                Tables\Columns\TextColumn::make('username')
+                    ->label('Username')
+                    ->searchable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('email')
                     ->label('Email')
                     ->searchable()
+                    ->placeholder('-')
+                    ->toggleable(isToggledHiddenByDefault: true)
                     ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('jabatan')
-                    ->label('Jabatan / Unit')
-                    ->formatStateUsing(fn (?string $state): string => $state ?: '-')
-                    ->description(fn (User $record): ?string => $record->unit_kerja)
-                    ->searchable(['jabatan', 'unit_kerja', 'nomor_telepon'])
-                    ->toggleable(),
 
                 Tables\Columns\BadgeColumn::make('role')
                     ->label('Peran')
@@ -205,17 +172,20 @@ class UserResource extends Resource
                         default => 'gray',
                     })
                     ->formatStateUsing(fn (string $state): string => User::ROLE_LABELS[$state] ?? $state)
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Status')
-                    ->boolean(),
+                    ->boolean()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Dibuat')
                     ->dateTime('d M Y H:i')
                     ->toggleable(isToggledHiddenByDefault: true)
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('role')

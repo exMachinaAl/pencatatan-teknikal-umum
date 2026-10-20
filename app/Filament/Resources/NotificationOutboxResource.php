@@ -51,10 +51,24 @@ class NotificationOutboxResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('id')->label('No.')->rowIndex(),
-                Tables\Columns\TextColumn::make('kanal')->label('Kanal')->badge()->formatStateUsing(fn (string $state) => strtoupper($state)),
-                Tables\Columns\TextColumn::make('tujuan')->label('Tujuan')->searchable()->limit(32),
-                Tables\Columns\TextColumn::make('payload.nomor_antrean')->label('No. Antrean')->searchable(),
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (NotificationOutbox $record): string => data_get($record->payload, 'nomor_antrean') ?: "Notifikasi #{$record->id}")
+                    ->description(fn (NotificationOutbox $record): string => collect([
+                        strtoupper($record->kanal),
+                        $record->tujuan,
+                        str($record->status)->replace('_', ' ')->title(),
+                        $record->created_at?->translatedFormat('d M Y, H:i'),
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
+                Tables\Columns\TextColumn::make('id')->label('No.')->rowIndex()->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('kanal')->label('Kanal')->badge()->formatStateUsing(fn (string $state) => strtoupper($state))->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('tujuan')->label('Tujuan')->searchable()->limit(32)->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('payload.nomor_antrean')->label('No. Antrean')->searchable()->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')->badge()
                     ->color(fn (string $state) => match ($state) {
@@ -63,9 +77,10 @@ class NotificationOutboxResource extends Resource
                         'menunggu_provider' => 'warning',
                         default => 'gray',
                     })
-                    ->formatStateUsing(fn (string $state) => str($state)->replace('_', ' ')->title()),
-                Tables\Columns\TextColumn::make('created_at')->label('Dibuat')->dateTime('d M Y, H:i')->sortable(),
-                Tables\Columns\TextColumn::make('error_terakhir')->label('Keterangan')->limit(45)->toggleable(),
+                    ->formatStateUsing(fn (string $state) => str($state)->replace('_', ' ')->title())
+                    ->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('created_at')->label('Dibuat')->dateTime('d M Y, H:i')->sortable()->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('error_terakhir')->label('Keterangan')->limit(45)->toggleable()->visibleFrom('md'),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([

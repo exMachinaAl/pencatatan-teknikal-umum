@@ -17,8 +17,8 @@ use App\Filament\Resources\SuratMasukResource;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Widgets\WorkspaceOverviewWidget;
-use App\Models\Legalisir;
 use App\Models\GajiBerkala;
+use App\Models\Legalisir;
 use App\Models\NotificationOutbox;
 use App\Models\Pegawai;
 use App\Models\SuratKeluar;
@@ -197,17 +197,18 @@ class RoleAuthorizationTest extends TestCase
 
         $this->flushSession();
         $admin = $this->user(User::ROLE_ADMIN, 'form-admin@test.com');
-        $admin->update(['foto_path' => 'profil_pengguna/pengurus.png']);
         $this->actingAs($admin);
 
         $this->get(UserResource::getUrl('create'))
             ->assertOk()
-            ->assertSee('Foto Pengurus / Pengguna')
-            ->assertSee('Jabatan Organisasi')
-            ->assertSee('Terhubung ke Data Pegawai');
+            ->assertSee('Username')
+            ->assertSee('NIP pegawai (opsional)')
+            ->assertSee('Email (opsional)')
+            ->assertDontSee('Foto Pengurus / Pengguna')
+            ->assertDontSee('Jabatan Organisasi');
         $this->get(UserResource::getUrl('edit', ['record' => $admin]))
             ->assertOk()
-            ->assertSee('Preview tersimpan');
+            ->assertSee('Username');
     }
 
     public function test_administrator_sistem_hanya_dapat_membaca_persuratan_dan_legalisir(): void
@@ -362,6 +363,7 @@ class RoleAuthorizationTest extends TestCase
     {
         return User::create([
             'name' => User::ROLE_LABELS[$role],
+            'username' => $role.uniqid(),
             'email' => $email ?? $role.uniqid().'@test.com',
             'password' => 'password',
             'role' => $role,

@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\AuditLogResource\Pages;
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Models\AuditLog;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -81,15 +81,31 @@ class AuditLogResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (AuditLog $record): string => strtoupper($record->aksi).' · '.$record->entitas)
+                    ->description(fn (AuditLog $record): string => collect([
+                        $record->user_name ?: 'Sistem',
+                        $record->created_at?->format('d/m/Y H:i'),
+                        $record->entitas_id ? 'ID '.$record->entitas_id : null,
+                        $record->ip,
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Waktu')
                     ->dateTime('d/m/Y H:i:s')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('user_name')
                     ->label('Pengguna')
                     ->searchable()
-                    ->weight('bold'),
+                    ->weight('bold')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('aksi')
                     ->label('Aksi')
@@ -99,17 +115,21 @@ class AuditLogResource extends Resource
                         'danger' => 'delete',
                         'info' => 'login',
                         'primary' => 'import',
-                    ]),
+                    ])
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('entitas')
                     ->label('Modul')
-                    ->searchable(),
+                    ->searchable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('entitas_id')
-                    ->label('ID Record'),
+                    ->label('ID Record')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('ip')
-                    ->label('IP Address'),
+                    ->label('IP Address')
+                    ->visibleFrom('md'),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([

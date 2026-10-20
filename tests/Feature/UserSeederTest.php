@@ -28,6 +28,7 @@ class UserSeederTest extends TestCase
         $this->assertTrue(Hash::check('rahasia-yang-sudah-diganti', $existing->password));
         $this->assertSame(User::ROLE_AUDITOR, $existing->role);
         $this->assertFalse($existing->is_active);
+        $this->assertSame('admin', $existing->username);
         $this->assertDatabaseCount('users', 5);
         $this->assertDatabaseHas('users', [
             'email' => 'kepala.tu@tu.sekolah.sch.id',
@@ -46,5 +47,23 @@ class UserSeederTest extends TestCase
 
         $this->assertTrue(Hash::check('password-baru-yang-aman', $kepala->refresh()->password));
         $this->assertDatabaseCount('users', 5);
+    }
+
+    public function test_seeder_memakai_password_dan_username_masing_masing_role(): void
+    {
+        config()->set('app.initial_user_passwords', [
+            'admin_sistem' => 'Admin-Aman-123',
+            'kepala_tu' => 'Kepala-TU-123',
+            'kepala_sekolah' => 'Kepala-Sekolah-123',
+            'petugas_tu' => 'Petugas-TU-123',
+            'pegawai' => 'Pegawai-Aman-123',
+        ]);
+
+        $this->seed(UserSeeder::class);
+
+        $admin = User::where('username', 'admin')->firstOrFail();
+        $kepalaTu = User::where('username', 'kepala_tu')->firstOrFail();
+        $this->assertTrue(Hash::check('Admin-Aman-123', $admin->password));
+        $this->assertTrue(Hash::check('Kepala-TU-123', $kepalaTu->password));
     }
 }

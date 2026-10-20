@@ -13,8 +13,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
@@ -48,7 +46,7 @@ class KenaikanPangkatResource extends Resource
                         Forms\Components\Select::make('pegawai_id')
                             ->label('Nama Pegawai')
                             ->relationship('pegawai', 'nama')
-                            ->getOptionLabelFromRecordUsing(fn (Pegawai $record) => "{$record->nama} - " . ($record->nip ?: 'Non-NIP') . " ({$record->golongan?->kode})")
+                            ->getOptionLabelFromRecordUsing(fn (Pegawai $record) => "{$record->nama} - ".($record->nip ?: 'Non-NIP')." ({$record->golongan?->kode})")
                             ->searchable()
                             ->preload()
                             ->required()
@@ -134,12 +132,28 @@ class KenaikanPangkatResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (KenaikanPangkat $record): string => $record->pegawai?->nama ?: 'Pegawai tidak tersedia')
+                    ->description(fn (KenaikanPangkat $record): string => collect([
+                        $record->pegawai?->nip ?: 'Non-NIP',
+                        KenaikanPangkat::JENIS_KP[$record->jenis] ?? $record->jenis,
+                        collect([$record->golonganLama?->kode, $record->golonganBaru?->kode])->filter()->implode(' → '),
+                        $record->tmt?->translatedFormat('d M Y'),
+                        KenaikanPangkat::STATUSES[$record->status] ?? $record->status,
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('pegawai.nama')
                     ->label('Nama Pegawai')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (KenaikanPangkat $record) => $record->pegawai?->nip ?: '-'),
+                    ->description(fn (KenaikanPangkat $record) => $record->pegawai?->nip ?: '-')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('jenis')
                     ->label('Jenis KP')
@@ -148,26 +162,31 @@ class KenaikanPangkatResource extends Resource
                         'success' => 'pilihan',
                         'warning' => 'penyesuaian_ijazah',
                     ])
-                    ->formatStateUsing(fn ($state) => KenaikanPangkat::JENIS_KP[$state] ?? $state),
+                    ->formatStateUsing(fn ($state) => KenaikanPangkat::JENIS_KP[$state] ?? $state)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('golonganLama.kode')
                     ->label('Gol Lama')
                     ->badge()
-                    ->color('gray'),
+                    ->color('gray')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('golonganBaru.kode')
                     ->label('Gol Baru')
                     ->badge()
-                    ->color('success'),
+                    ->color('success')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('periode')
                     ->label('Periode')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tmt')
                     ->label('TMT')
                     ->date('d M Y')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status Alur')
@@ -178,13 +197,15 @@ class KenaikanPangkatResource extends Resource
                         'primary' => 'diserahkan',
                     ])
                     ->formatStateUsing(fn ($state) => KenaikanPangkat::STATUSES[$state] ?? $state)
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('nomor_sk')
                     ->label('Nomor SK')
                     ->searchable()
                     ->placeholder('Belum terbit')
-                    ->limit(25),
+                    ->limit(25)
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
@@ -252,7 +273,7 @@ class KenaikanPangkatResource extends Resource
                             static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="kenaikan-pangkat-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="kenaikan-pangkat-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records) {

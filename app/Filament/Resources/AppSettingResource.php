@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\AppSettingResource\Pages;
+use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Models\AppSetting;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -56,22 +56,39 @@ class AppSettingResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (AppSetting $record): string => $record->key)
+                    ->description(fn (AppSetting $record): string => collect([
+                        str((string) $record->value)->limit(55),
+                        $record->deskripsi ? str($record->deskripsi)->limit(70) : null,
+                        $record->updated_at?->translatedFormat('d M Y H:i'),
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('key')
                     ->label('Kunci')
                     ->weight('bold')
-                    ->searchable(),
+                    ->searchable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('value')
                     ->label('Nilai Pengaturan')
-                    ->limit(50),
+                    ->limit(50)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('deskripsi')
                     ->label('Keterangan')
-                    ->limit(60),
+                    ->limit(60)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('updated_at')
                     ->label('Terakhir Diubah')
-                    ->dateTime('d M Y H:i'),
+                    ->dateTime('d M Y H:i')
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 //

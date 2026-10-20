@@ -6,8 +6,8 @@ use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Validation\ValidationException;
@@ -18,11 +18,17 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
 
     public const ROLE_ADMIN = 'admin';
+
     public const ROLE_KEPALA_TU = 'kepala_tu';
+
     public const ROLE_PETUGAS_TU = 'petugas_tu';
+
     public const ROLE_KEPEGAWAIAN = 'kepegawaian';
+
     public const ROLE_KEPALA_SEKOLAH = 'kepala_sekolah';
+
     public const ROLE_AUDITOR = 'auditor';
+
     public const ROLE_PEGAWAI = 'pegawai';
 
     public const ROLE_LABELS = [
@@ -77,6 +83,7 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
 
     protected $fillable = [
         'pegawai_id',
+        'username',
         'name',
         'email',
         'nomor_telepon',
@@ -102,6 +109,35 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     protected static function booted(): void
     {
         static::saving(function (User $user): void {
+            if ($user->username !== null) {
+                $user->username = mb_strtolower(trim((string) $user->username)) ?: null;
+            }
+
+            if ($user->username !== null) {
+                if (! preg_match('/^[a-z0-9][a-z0-9._-]{2,49}$/D', $user->username)) {
+                    throw ValidationException::withMessages([
+                        'username' => 'Username harus 3–50 karakter dan hanya boleh berisi huruf kecil, angka, titik, garis bawah, atau tanda hubung.',
+                    ]);
+                }
+
+                $usernameDipakai = static::withTrashed()
+                    ->where('username', $user->username)
+                    ->when($user->exists, fn ($query) => $query->whereKeyNot($user->getKey()))
+                    ->exists();
+
+                if ($usernameDipakai) {
+                    throw ValidationException::withMessages(['username' => 'Username sudah digunakan.']);
+                }
+            }
+
+            if ($user->email !== null) {
+                $user->email = mb_strtolower(trim((string) $user->email)) ?: null;
+            }
+
+            if ($user->email !== null && (mb_strlen($user->email, 'UTF-8') > 160 || ! filter_var($user->email, FILTER_VALIDATE_EMAIL))) {
+                throw ValidationException::withMessages(['email' => 'Alamat email tidak valid.']);
+            }
+
             if ($user->nomor_telepon !== null) {
                 $user->nomor_telepon = trim((string) $user->nomor_telepon) ?: null;
             }
@@ -127,6 +163,26 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
     {
         return (bool) $this->is_active
             && array_key_exists($this->normalizedRole(), self::ROLE_LABELS);
+    }
+
+    public static function findForLogin(string $identifier): ?self
+    {
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return null;
+        }
+
+        $normalized = mb_strtolower($identifier);
+        $nip = preg_replace('/\s+/', '', $identifier);
+
+        $user = static::query()
+            ->where('username', $normalized)
+            ->orWhereRaw('LOWER(email) = ?', [$normalized])
+            ->first();
+
+        return $user ?? static::query()
+            ->whereHas('pegawai', fn ($pegawai) => $pegawai->where('nip', $nip))
+            ->first();
     }
 
     public function pegawai(): BelongsTo

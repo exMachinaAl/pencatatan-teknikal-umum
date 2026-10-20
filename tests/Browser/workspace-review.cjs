@@ -37,7 +37,7 @@ const profile = (process.env.REVIEW_PROFILE || 'default').replace(/[^a-z0-9_-]/g
                 results.push(`Login ${theme} ${width}: no horizontal overflow`);
             }
             if (process.env.REVIEW_EMAIL && process.env.REVIEW_PASSWORD) {
-                await page.locator('input[type=email]').fill(process.env.REVIEW_EMAIL);
+                await page.locator('input[autocomplete=username]').fill(process.env.REVIEW_EMAIL);
                 await page.locator('input[type=password]').fill(process.env.REVIEW_PASSWORD);
                 await page.locator('button[type=submit]').click();
                 await page.waitForURL(url => url.pathname === '/admin', { timeout: 15000 });
@@ -78,9 +78,12 @@ const profile = (process.env.REVIEW_PROFILE || 'default').replace(/[^a-z0-9_-]/g
                 }
 
                 if (process.env.REVIEW_ACTION_MENU_PATH) {
+                    await page.setViewportSize({ width: 360, height: 900 });
                     await page.goto(`${baseUrl}${process.env.REVIEW_ACTION_MENU_PATH}`);
                     const trigger = page.locator('.fi-ta-actions .fi-dropdown-trigger button:visible').first();
                     await trigger.waitFor();
+                    const triggerBox = await trigger.boundingBox();
+                    assert(triggerBox && triggerBox.x >= 280, 'Mobile row action must stay on the right edge.');
                     await trigger.click();
                     const menu = page.locator('.fi-dropdown-panel:visible').last();
                     await menu.waitFor({ state: 'visible' });

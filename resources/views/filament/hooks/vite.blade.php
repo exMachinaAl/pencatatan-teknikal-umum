@@ -18,4 +18,4 @@
 {{-- TU-UI-V1.3-TABLE-FIX --}}
 <link rel="stylesheet" href="{{ asset('css/tu-ui-v13-table-fix.css') }}?v=20261019-13" />
 {{-- TU-UI-V2.0-OPERATIONAL --}}
-<link rel="stylesheet" href="{{ asset('css/tu-ui-v20-operasional.css') }}?v=20261019-21" />
+<link rel="stylesheet" href="{{ asset('css/tu-ui-v20-operasional.css') }}?v=20261020-25" />

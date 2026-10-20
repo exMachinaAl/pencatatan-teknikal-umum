@@ -172,6 +172,13 @@ class LegalisirResource extends Resource
                             ->maxSize(5120)
                             ->columnSpanFull(),
 
+                        Forms\Components\TextInput::make('tautan_lampiran')
+                            ->label('Tautan Google Drive / Sheets / Lampiran')
+                            ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
+                            ->url()
+                            ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
+                            ->columnSpanFull(),
+
                         Forms\Components\Textarea::make('catatan')
                             ->label('Catatan Petugas (Tahun Lulus, No Seri Ijazah, dll)')
                             ->rows(3)
@@ -190,19 +197,36 @@ class LegalisirResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ViewColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->view('filament.tables.columns.document-mobile-summary', fn (Legalisir $record): array => [
+                        'title' => $record->nama_pemohon,
+                        'meta' => collect([
+                            $record->nomor_antrean ?: $record->nomor_legalisir,
+                            trim("{$record->jenis_dokumen} · {$record->jumlah_lembar} lembar"),
+                            $record->tanggal_permohonan?->translatedFormat('d M Y'),
+                            Legalisir::STATUSES[$record->status] ?? $record->status,
+                        ])->filter()->implode(' · '),
+                        'externalAttribute' => 'tautan_lampiran',
+                    ])
+                    ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\TextColumn::make('nomor_antrean')
                     ->label('No. Antrean')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (Legalisir $record) => $record->nomor_legalisir),
+                    ->description(fn (Legalisir $record) => $record->nomor_legalisir)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('nama_pemohon')
                     ->label('Nama Pemohon')
                     ->searchable()
                     ->sortable()
                     ->weight('semibold')
-                    ->description(fn (Legalisir $record) => $record->kontak ?: '-'),
+                    ->description(fn (Legalisir $record) => $record->kontak ?: '-')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status_pemohon')
                     ->label('Pemohon')
@@ -212,18 +236,21 @@ class LegalisirResource extends Resource
                         'warning' => 'wali',
                         'gray' => 'lainnya',
                     ])
-                    ->formatStateUsing(fn ($state) => Legalisir::STATUS_PEMOHON[$state] ?? $state),
+                    ->formatStateUsing(fn ($state) => Legalisir::STATUS_PEMOHON[$state] ?? $state)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('jenis_dokumen')
                     ->label('Dokumen')
                     ->badge()
                     ->color('info')
-                    ->description(fn (Legalisir $record) => "{$record->jumlah_lembar} Lembar"),
+                    ->description(fn (Legalisir $record) => "{$record->jumlah_lembar} Lembar")
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tanggal_permohonan')
                     ->label('Tgl Permohonan')
                     ->date('d M Y')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status')
@@ -235,13 +262,22 @@ class LegalisirResource extends Resource
                         'danger' => 'ditolak',
                     ])
                     ->formatStateUsing(fn ($state) => Legalisir::STATUSES[$state] ?? $state)
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
+
+                Tables\Columns\ViewColumn::make('document_links')
+                    ->label('Lampiran')
+                    ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
+                    ->extraCellAttributes(['class' => 'tu-document-cell'])
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('pengambil')
                     ->label('Diambil Oleh')
                     ->placeholder('Belum diambil')
-                    ->limit(20),
+                    ->limit(20)
+                    ->visibleFrom('md'),
             ])
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
             ->filters([
                 Tables\Filters\Filter::make('perlu_tindak_lanjut')
                     ->label('Menunggu verifikasi / proses')

@@ -15,7 +15,7 @@ assert(['127.0.0.1', 'localhost'].includes(new URL(baseUrl).hostname), 'Review i
 
     try {
         await page.goto(`${baseUrl}/admin/login`);
-        await page.locator('input[type=email]').fill(process.env.REVIEW_EMAIL);
+        await page.locator('input[autocomplete=username]').fill(process.env.REVIEW_EMAIL);
         await page.locator('input[type=password]').fill(process.env.REVIEW_PASSWORD);
         await page.locator('button[type=submit]').click();
         await page.waitForURL(url => url.pathname === '/admin');

@@ -6,15 +6,12 @@ use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\PegawaiResource\Pages;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
-use Carbon\Carbon;
 use Filament\Forms;
 use Filament\Forms\Form;
-use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
@@ -190,18 +187,36 @@ class PegawaiResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('mobile_summary')
+                    ->label('Ringkasan')
+                    ->state(fn (Pegawai $record): string => $record->nama)
+                    ->description(fn (Pegawai $record): string => collect([
+                        $record->nip ?: 'Non-NIP',
+                        $record->status_kepegawaian,
+                        $record->jabatan,
+                        $record->unit_kerja,
+                        $record->golongan?->kode ? "Gol. {$record->golongan->kode}" : null,
+                        $record->is_active ? 'Aktif' : 'Nonaktif',
+                    ])->filter()->implode(' · '))
+                    ->weight('bold')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->hiddenFrom('md'),
+
                 Tables\Columns\ImageColumn::make('foto_path')
                     ->label('Foto')
                     ->getStateUsing(fn (Pegawai $record): ?string => $record->foto_path ? route('profil.pegawai.foto', $record) : null)
                     ->circular()
-                    ->height(40),
+                    ->height(40)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('nama')
                     ->label('Nama Pegawai')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (Pegawai $record) => $record->nip ?: 'Non-NIP'),
+                    ->description(fn (Pegawai $record) => $record->nip ?: 'Non-NIP')
+                    ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status_kepegawaian')
                     ->label('Status')
@@ -210,30 +225,35 @@ class PegawaiResource extends Resource
                         'warning' => 'PPPK',
                         'gray' => 'Honorer',
                     ])
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('jabatan')
                     ->label('Jabatan')
                     ->searchable()
                     ->limit(30)
-                    ->description(fn (Pegawai $record): ?string => $record->unit_kerja),
+                    ->description(fn (Pegawai $record): ?string => $record->unit_kerja)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('nomor_telepon')
                     ->label('Kontak')
                     ->searchable(['nomor_telepon', 'email'])
                     ->description(fn (Pegawai $record): ?string => $record->email)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('golongan.kode')
                     ->label('Gol/Ruang')
                     ->badge()
                     ->color('info')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('tmt_pangkat_terakhir')
                     ->label('TMT Pangkat')
                     ->date('d M Y')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('perkiraan_kp_berikutnya')
                     ->label('Estimasi KP')
@@ -242,7 +262,8 @@ class PegawaiResource extends Resource
                     })
                     ->badge()
                     ->color(fn (Pegawai $record) => $record->is_calon_kp ? 'danger' : 'gray')
-                    ->description(fn (Pegawai $record) => $record->is_calon_kp ? '⚡ Calon KP' : null),
+                    ->description(fn (Pegawai $record) => $record->is_calon_kp ? '⚡ Calon KP' : null)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('perkiraan_kgb_berikutnya')
                     ->label('Estimasi KGB')
@@ -251,12 +272,14 @@ class PegawaiResource extends Resource
                     })
                     ->badge()
                     ->color(fn (Pegawai $record) => $record->is_jatuh_tempo_kgb ? 'warning' : 'gray')
-                    ->description(fn (Pegawai $record) => $record->is_jatuh_tempo_kgb ? '⏳ Jatuh Tempo' : null),
+                    ->description(fn (Pegawai $record) => $record->is_jatuh_tempo_kgb ? '⏳ Jatuh Tempo' : null)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Aktif')
                     ->boolean()
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status_kepegawaian')
@@ -316,7 +339,7 @@ class PegawaiResource extends Resource
                             static::authorizeResourceAction('export');
                             $headers = [
                                 'Content-Type' => 'text/csv',
-                                'Content-Disposition' => 'attachment; filename="data-pegawai-' . date('Ymd-His') . '.csv"',
+                                'Content-Disposition' => 'attachment; filename="data-pegawai-'.date('Ymd-His').'.csv"',
                             ];
 
                             $callback = function () use ($records) {
