@@ -143,14 +143,6 @@ return [
         // 'store'  => 'redis',
     ],
 
-    'initial_user_passwords' => [
-        'admin_sistem' => env('TU_ADMIN_SISTEM_INITIAL_PASSWORD', env('TU_ADMIN_INITIAL_PASSWORD')),
-        'kepala_tu' => env('TU_KEPALA_TU_INITIAL_PASSWORD'),
-        'kepala_sekolah' => env('TU_KEPALA_SEKOLAH_INITIAL_PASSWORD', env('TU_KEPALA_INITIAL_PASSWORD')),
-        'petugas_tu' => env('TU_PETUGAS_TU_INITIAL_PASSWORD', env('TU_STAF_INITIAL_PASSWORD')),
-        'pegawai' => env('TU_PEGAWAI_INITIAL_PASSWORD'),
-    ],
-
     /*
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers

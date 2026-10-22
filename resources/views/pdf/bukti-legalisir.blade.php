@@ -164,17 +164,6 @@
             <td class="value">{{ $legalisir->jumlah_lembar }} Lembar</td>
         </tr>
         <tr>
-            <td class="label">Biaya Administrasi</td>
-            <td class="separator">:</td>
-            <td class="value">
-                @if($legalisir->biaya > 0)
-                    Rp {{ number_format($legalisir->biaya, 0, ',', '.') }}
-                @else
-                    <strong>GRATIS (Rp 0)</strong>
-                @endif
-            </td>
-        </tr>
-        <tr>
             <td class="label">Status Saat Ini</td>
             <td class="separator">:</td>
             <td class="value">{{ \App\Models\Legalisir::STATUSES[$legalisir->status] ?? $legalisir->status }}</td>

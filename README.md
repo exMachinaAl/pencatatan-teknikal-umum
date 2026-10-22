@@ -30,12 +30,12 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 * Lembar **Disposisi Pimpinan Digital**: Pencatatan arahan/instruksi Kepala Sekolah/Kepala TU, batas waktu, dan catatan tindak lanjut.
 * Pengarsipan ganda: Pencatatan lokasi fisik lemari/ordner/boks arsip dan unggahan softfile scan dokumen (PDF/JPG/PNG, proteksi disk privat, maksimal 5 MB).
 * Preview PDF atau gambar tersedia dari detail record tanpa menjadikan file publik; izin pengguna tetap diperiksa dan akses dicatat.
-* Filter lengkap: Rentang tanggal diterima, pengirim, klasifikasi surat, sifat surat (Biasa, Penting, Segera, Rahasia), dan status arsip.
+* Filter surat masuk: rentang tanggal diterima, klasifikasi surat, dan status arsip. Kode klasifikasi dapat dicari atau ditambahkan langsung saat mencatat surat.
 
 ### 5. Surat Keluar & Kearsipan
 * **Nomor Surat Resmi**: Nomor surat keluar diisi manual mengikuti nomor yang telah ditetapkan sekolah dan diperiksa unik oleh sistem.
 * Nomor agenda surat masuk tetap dibuat otomatis sebagai identitas internal TU, terpisah dari nomor surat instansi asal.
-* Pencatatan pembuat konsep, penandatangan, tujuan surat, sifat, dan softfile final bertanda tangan.
+* Pencatatan nomor resmi, tanggal, tujuan, kode klasifikasi, lokasi arsip, dan softfile final bertanda tangan. Status alur dikelola otomatis melalui aksi tabel.
 
 ### 6. Layanan Legalisir Dokumen
 * Layanan permohonan legalisir bagi alumni, siswa aktif, maupun orang tua/wali (Ijazah, SKHUN, Transkrip Nilai, dll).
@@ -54,9 +54,11 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
   5. Pencatatan log impor ke tabel `import_gform_log`.
 
 ### 8. Lampiran Langsung dan Tautan Google
-* Lampiran privat Surat Masuk, Surat Keluar, dan Legalisir dapat dibuka langsung dari kolom **Lampiran** pada tabel tanpa masuk ke halaman detail.
-* Form dokumen menerima tautan HTTPS Google Drive, Google Sheets, Google Form, atau penyedia lampiran lain. Tautan ditampilkan berdampingan dengan berkas lokal jika keduanya tersedia.
+* Lampiran privat dapat dipratinjau dan diunduh langsung dari kolom **Lampiran** pada tabel tanpa masuk ke halaman detail.
+* Surat Masuk, Surat Keluar, Legalisir, Kenaikan Pangkat, dan Gaji Berkala menerima tautan HTTPS Google Drive, Google Sheets, Google Form, atau penyedia lampiran lain. Tautan hanya ditampilkan bila diisi.
+* Template impor dan hasil ekspor menyertakan kolom tautan opsional agar tautan dapat ikut dibagikan melalui spreadsheet.
 * Berkas lokal tetap melewati otorisasi aplikasi dan dicatat pada log akses. Hak akses tautan Google mengikuti pengaturan berbagi pada Google Drive; gunakan pembatasan akun organisasi untuk dokumen sensitif.
+* Panduan penggunaan tersedia di [docs/PANDUAN-SPREADSHEET-DAN-LAMPIRAN.md](docs/PANDUAN-SPREADSHEET-DAN-LAMPIRAN.md).
 
 ### 8. Audit Log & Keamanan
 * Pencatatan otomatis riwayat aksi `create`, `update`, `delete`, `restore`, dan `import` menggunakan Model Observers.
@@ -72,7 +74,7 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 
 Seeder membuat lima akun lokal berikut. Administrator Sistem berada di Divisi IT sebagai fasilitator teknis dan bukan atasan operasional TU. Kepala TU adalah pimpinan tertinggi di lingkungan TU. Dua role tambahan (`kepegawaian` dan `auditor`) dapat diberikan Administrator Sistem kepada pengguna nyata melalui menu Kelola Pengguna.
 
-> Password awal dibaca dari variabel `TU_*_INITIAL_PASSWORD` di `.env`. Seeder tidak akan menimpa password, role, atau status akun yang sudah ada.
+> Seluruh akun bawaan menggunakan password `password`. Menjalankan `UserSeeder` ulang akan mereset password kelima akun bawaan menjadi `password`, tanpa mengubah role atau status aktifnya.
 
 | Peran (Role) | Username | Email Lama | Kata Sandi | Hak Akses Utama |
 |---|---|---|---|---|

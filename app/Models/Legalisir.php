@@ -31,6 +31,7 @@ class Legalisir extends Model
         'status_pemohon',
         'jenis_dokumen',
         'nomor_dokumen',
+        'lokasi_arsip_fisik',
         'tahun_lulus',
         'jumlah_lembar',
         'dokumen_asli_dilihat',
@@ -107,6 +108,7 @@ class Legalisir extends Model
             $legalisir->status_pemohon ??= 'alumni';
             $legalisir->kanal_notifikasi ??= 'tidak_ada';
             $legalisir->jumlah_lembar ??= 1;
+            $legalisir->lokasi_arsip_fisik = trim((string) $legalisir->lokasi_arsip_fisik) ?: null;
             if (! array_key_exists('biaya', $legalisir->getAttributes()) || $legalisir->getAttributes()['biaya'] === null) {
                 $legalisir->setAttribute('biaya', 0);
             }
@@ -123,6 +125,11 @@ class Legalisir extends Model
             }
             if (! array_key_exists((string) $legalisir->kanal_notifikasi, self::KANAL_NOTIFIKASI)) {
                 throw ValidationException::withMessages(['kanal_notifikasi' => 'Kanal notifikasi tidak valid.']);
+            }
+            if ($legalisir->lokasi_arsip_fisik !== null
+                && (mb_strlen($legalisir->lokasi_arsip_fisik, 'UTF-8') > 150
+                    || preg_match('/[\x00-\x1F\x7F]/', $legalisir->lokasi_arsip_fisik))) {
+                throw ValidationException::withMessages(['lokasi_arsip_fisik' => 'Lokasi arsip maksimal 150 karakter dan tidak boleh mengandung karakter kontrol.']);
             }
             $attributes = $legalisir->getAttributes();
             if (! preg_match('/^\d+$/D', (string) ($attributes['jumlah_lembar'] ?? '')) || (int) $legalisir->jumlah_lembar < 1 || (int) $legalisir->jumlah_lembar > 10000) {

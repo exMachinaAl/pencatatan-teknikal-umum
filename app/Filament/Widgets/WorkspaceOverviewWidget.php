@@ -37,6 +37,7 @@ class WorkspaceOverviewWidget extends Widget
         $canViewKepegawaian = $user?->canPerform('kepegawaian', 'view') ?? false;
 
         $suratMasuk = $canViewSurat ? SuratMasuk::query()
+            ->with('klasifikasi')
             ->whereIn('status', ['baru', 'didisposisi'])
             ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_diterima')
@@ -44,6 +45,7 @@ class WorkspaceOverviewWidget extends Widget
             ->first() : null;
 
         $suratKeluar = $canViewSurat ? SuratKeluar::query()
+            ->with('klasifikasi')
             ->where('status', 'draf')
             ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_surat')

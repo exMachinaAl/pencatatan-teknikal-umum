@@ -2,8 +2,8 @@
     <div class="space-y-6">
         <div class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900">
             <p class="mb-4 text-sm text-gray-600 dark:text-gray-300">
-                <strong>V3.1 — Kepegawaian.</strong> Download template, isi data, lalu periksa pratinjau sebelum menyimpan.
-                Data lama tidak akan diubah. Impor KP dan KGB memerlukan pegawai yang sudah ada.
+                <strong>Pertukaran Data Kepegawaian.</strong> Unduh template terbaru, isi data, lalu periksa pratinjau sebelum menyimpan.
+                Struktur template mengikuti input ringkas Pegawai, KP, dan KGB. Data lama tidak akan diubah.
             </p>
             <form wire:submit="previewImport" class="space-y-4">
                 {{ $this->form }}
@@ -16,7 +16,7 @@
                 </div>
             </form>
             <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                Hak akses: Admin dapat impor/ekspor semua modul; Staf hanya Pegawai &amp; KP; Kepala hanya ekspor. Nominal KGB tidak boleh diakses Staf.
+                Hak impor dan ekspor mengikuti role pengguna. Impor hanya menambahkan data baru dan melewati baris duplikat.
             </p>
         </div>
 
@@ -51,7 +51,7 @@
                         </table>
                     </div>
                 @endif
-                <p class="text-xs text-gray-500 dark:text-gray-400">Hanya 5 contoh baris. Nominal gaji disembunyikan pada pratinjau. Impor menambah data saja, tidak memperbarui baris lama.</p>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Maksimal 5 contoh baris ditampilkan. Impor menambah data saja dan tidak memperbarui baris lama.</p>
                 @if (($preview['invalid'] ?? 0)===0 && ($preview['valid'] ?? 0)>0)
                     <x-filament::button wire:click="commitImport" icon="heroicon-o-check-circle" color="success">Konfirmasi Import {{ $preview['valid'] }} Baris</x-filament::button>
                 @endif

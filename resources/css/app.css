@@ -896,3 +896,473 @@ html {
         padding-inline: 1rem;
     }
 }
+
+/* Ringkasan hak akses: halaman operasional, bukan dokumen panjang. */
+.tu-access-page {
+    display: grid;
+    min-width: 0;
+    gap: 1rem;
+}
+
+.tu-access-hero {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    min-width: 0;
+    padding: 1.25rem 1.4rem;
+    border: 1px solid var(--tu-forest);
+    border-radius: 0.45rem;
+    background: var(--tu-forest);
+    color: #fffdf8;
+}
+
+.tu-access-hero-icon {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgb(255 255 255 / 24%);
+    border-radius: 0.4rem;
+    background: rgb(255 255 255 / 8%);
+}
+
+.tu-access-hero-icon svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.tu-access-hero-copy {
+    min-width: 0;
+}
+
+.tu-access-eyebrow {
+    margin: 0 0 0.3rem;
+    color: var(--tu-accent);
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.09em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.tu-access-hero .tu-access-eyebrow {
+    color: var(--tu-gold);
+}
+
+.tu-access-hero h2,
+.tu-access-panel h2,
+.tu-access-module-card h3 {
+    margin: 0;
+    color: inherit;
+    font-weight: 720;
+}
+
+.tu-access-hero h2 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+    line-height: 1.2;
+}
+
+.tu-access-hero-copy > p:last-child {
+    margin: 0.45rem 0 0;
+    color: #c7d9d5;
+    font-size: 0.82rem;
+    line-height: 1.5;
+}
+
+.tu-access-current-role {
+    display: grid;
+    flex: 0 0 auto;
+    gap: 0.15rem;
+    margin-left: auto;
+    padding: 0.65rem 0.85rem;
+    border-left: 2px solid var(--tu-gold);
+}
+
+.tu-access-current-role span {
+    color: #b6cbc6;
+    font-size: 0.65rem;
+    font-weight: 650;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.tu-access-current-role strong {
+    max-width: 15rem;
+    font-size: 0.84rem;
+    line-height: 1.35;
+}
+
+.tu-access-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow: hidden;
+    border: 1px solid var(--tu-line);
+    border-radius: 0.45rem;
+    background: var(--tu-surface);
+}
+
+.tu-access-stat {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-width: 0;
+    padding: 0.8rem 1rem;
+}
+
+.tu-access-stat + .tu-access-stat {
+    border-left: 1px solid var(--tu-line);
+}
+
+.tu-access-stat span {
+    color: var(--tu-muted);
+    font-size: 0.75rem;
+}
+
+.tu-access-stat strong {
+    color: var(--tu-ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.35rem;
+}
+
+.tu-access-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid var(--tu-line);
+    border-radius: 0.45rem;
+    background: var(--tu-surface);
+}
+
+.tu-access-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.5rem;
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid var(--tu-line);
+}
+
+.tu-access-panel-header h2 {
+    color: var(--tu-ink);
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+.tu-access-panel-header > p {
+    max-width: 24rem;
+    margin: 0;
+    color: var(--tu-muted);
+    font-size: 0.73rem;
+    line-height: 1.45;
+    text-align: right;
+}
+
+.tu-access-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.tu-access-table {
+    width: 100%;
+    min-width: 64rem;
+    border-collapse: separate;
+    border-spacing: 0;
+    color: var(--tu-ink);
+    font-size: 0.75rem;
+    text-align: left;
+}
+
+.tu-access-table th,
+.tu-access-table td {
+    padding: 0.72rem 0.8rem;
+    border-bottom: 1px solid var(--tu-line);
+    vertical-align: top;
+}
+
+.tu-access-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--tu-accent-soft);
+    color: var(--tu-muted);
+    font-size: 0.65rem;
+    font-weight: 750;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    text-transform: uppercase;
+}
+
+.tu-access-table thead th:first-child,
+.tu-access-table tbody th {
+    width: 12rem;
+}
+
+.tu-access-table tbody th {
+    background: color-mix(in srgb, var(--tu-surface) 94%, var(--tu-accent-soft));
+    font-size: 0.76rem;
+    line-height: 1.4;
+}
+
+.tu-access-table tbody tr:last-child > * {
+    border-bottom: 0;
+}
+
+.tu-access-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.28rem;
+}
+
+.tu-access-badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.35rem;
+    padding: 0.18rem 0.4rem;
+    border: 1px solid color-mix(in srgb, var(--tu-accent) 28%, transparent);
+    border-radius: 999px;
+    background: var(--tu-accent-soft);
+    color: var(--tu-accent);
+    font-size: 0.64rem;
+    font-weight: 650;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+.tu-access-empty {
+    color: var(--tu-muted);
+    font-size: 0.69rem;
+    font-style: italic;
+}
+
+.tu-access-mobile-list {
+    display: none;
+}
+
+.tu-access-link {
+    display: inline-flex;
+    min-height: 2.25rem;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0.65rem;
+    border: 1px solid var(--tu-line);
+    border-radius: 0.35rem;
+    color: var(--tu-accent);
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.tu-access-link:hover {
+    background: var(--tu-accent-soft);
+}
+
+.tu-access-link svg {
+    width: 0.9rem;
+    height: 0.9rem;
+}
+
+.tu-audit-list {
+    display: grid;
+}
+
+.tu-audit-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.72rem 1.15rem;
+    border-bottom: 1px solid var(--tu-line);
+}
+
+.tu-audit-row:last-child {
+    border-bottom: 0;
+}
+
+.tu-audit-icon {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: 50%;
+    background: var(--tu-accent-soft);
+    color: var(--tu-accent);
+}
+
+.tu-audit-icon svg {
+    width: 1rem;
+    height: 1rem;
+}
+
+.tu-audit-copy {
+    display: grid;
+    min-width: 0;
+    gap: 0.08rem;
+}
+
+.tu-audit-copy strong {
+    overflow: hidden;
+    color: var(--tu-ink);
+    font-size: 0.76rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tu-audit-copy span,
+.tu-audit-row time {
+    color: var(--tu-muted);
+    font-size: 0.68rem;
+    line-height: 1.4;
+}
+
+.tu-audit-row time {
+    white-space: nowrap;
+}
+
+.tu-access-empty-state {
+    display: grid;
+    justify-items: center;
+    gap: 0.3rem;
+    padding: 2rem 1rem;
+    color: var(--tu-muted);
+    text-align: center;
+}
+
+.tu-access-empty-state svg {
+    width: 1.5rem;
+    height: 1.5rem;
+}
+
+.tu-access-empty-state strong {
+    color: var(--tu-ink);
+    font-size: 0.8rem;
+}
+
+.tu-access-empty-state span {
+    font-size: 0.7rem;
+}
+
+@media (max-width: 900px) {
+    .tu-access-table-wrap {
+        display: none;
+    }
+
+    .tu-access-mobile-list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+        padding: 0.85rem;
+    }
+
+    .tu-access-module-card {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--tu-line);
+        border-radius: 0.4rem;
+    }
+
+    .tu-access-module-card h3 {
+        padding: 0.7rem 0.8rem;
+        border-bottom: 1px solid var(--tu-line);
+        background: var(--tu-accent-soft);
+        color: var(--tu-ink);
+        font-size: 0.78rem;
+    }
+
+    .tu-access-module-card dl,
+    .tu-access-module-card dd {
+        margin: 0;
+    }
+
+    .tu-access-module-card dl > div {
+        display: grid;
+        grid-template-columns: minmax(7.5rem, 0.7fr) minmax(0, 1.3fr);
+        gap: 0.65rem;
+        padding: 0.62rem 0.8rem;
+        border-bottom: 1px solid var(--tu-line);
+    }
+
+    .tu-access-module-card dl > div:last-child {
+        border-bottom: 0;
+    }
+
+    .tu-access-module-card dt {
+        color: var(--tu-muted);
+        font-size: 0.67rem;
+        font-weight: 650;
+        line-height: 1.4;
+    }
+}
+
+@media (max-width: 640px) {
+    .tu-access-page {
+        gap: 0.75rem;
+    }
+
+    .tu-access-hero {
+        align-items: flex-start;
+        padding: 1rem;
+    }
+
+    .tu-access-hero-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+    }
+
+    .tu-access-current-role {
+        display: none;
+    }
+
+    .tu-access-hero-copy > p:last-child {
+        font-size: 0.75rem;
+    }
+
+    .tu-access-stats {
+        grid-template-columns: 1fr;
+    }
+
+    .tu-access-stat {
+        padding: 0.65rem 0.85rem;
+    }
+
+    .tu-access-stat + .tu-access-stat {
+        border-top: 1px solid var(--tu-line);
+        border-left: 0;
+    }
+
+    .tu-access-panel-header {
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.85rem;
+    }
+
+    .tu-access-panel-header > p {
+        display: none;
+    }
+
+    .tu-access-panel-header--action {
+        flex-direction: column;
+    }
+
+    .tu-access-mobile-list {
+        grid-template-columns: 1fr;
+        gap: 0.65rem;
+        padding: 0.65rem;
+    }
+
+    .tu-access-module-card dl > div {
+        grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 1.2fr);
+        padding: 0.55rem 0.65rem;
+    }
+
+    .tu-audit-row {
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 0.65rem;
+        padding: 0.65rem 0.85rem;
+    }
+
+    .tu-audit-row time {
+        grid-column: 2;
+        margin-top: -0.35rem;
+    }
+}

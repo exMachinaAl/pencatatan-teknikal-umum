@@ -22,6 +22,15 @@ class DocumentAttachmentLink
                 'url' => route($attachment->is_previewable ? 'lampiran.preview' : 'lampiran.download', $attachment),
                 'title' => $attachment->nama_file,
             ];
+
+            if ($attachment->is_previewable) {
+                $links[] = [
+                    'icon' => 'heroicon-o-arrow-down-tray',
+                    'label' => 'Unduh file',
+                    'url' => route('lampiran.download', $attachment),
+                    'title' => 'Unduh '.$attachment->nama_file,
+                ];
+            }
         }
 
         if ($url = self::safeExternalUrl($externalUrl)) {

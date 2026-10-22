@@ -1,18 +1,25 @@
 <?php
+
 namespace App\Filament\Pages;
 
 use App\Support\TuAccess;
 use Filament\Pages\Page;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class TuSecurityOverview extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';
+
     protected static ?string $navigationGroup = 'Pengaturan & Utilitas';
-    protected static ?string $navigationLabel = 'Ringkasan Hak Akses';
-    protected static ?string $title = 'Ringkasan Hak Akses & Audit';
+
+    protected static ?string $navigationLabel = 'Hak Akses';
+
+    protected static ?string $title = 'Hak Akses Pengguna';
+
     protected static ?int $navigationSort = 6;
+
     protected static string $view = 'filament.pages.tu-security-overview';
 
     public static function canAccess(): bool
@@ -37,6 +44,7 @@ class TuSecurityOverview extends Page
             }
             $rows[] = ['module' => $name, 'access' => $cells];
         }
+
         return $rows;
     }
 
@@ -49,7 +57,8 @@ class TuSecurityOverview extends Page
                 'user' => (string) ($row->user_name ?: 'Sistem'),
                 'action' => (string) $row->aksi,
                 'entity' => (string) ($row->entitas ?: '-'),
-                'when' => (string) $row->created_at,
+                'when' => Carbon::parse($row->created_at)->translatedFormat('d M Y, H:i'),
+                'iso' => Carbon::parse($row->created_at)->toIso8601String(),
             ])->all();
     }
 }

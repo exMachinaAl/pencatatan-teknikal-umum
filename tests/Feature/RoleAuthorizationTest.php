@@ -9,16 +9,23 @@ use App\Filament\Pages\TuPersonnelExchangePage;
 use App\Filament\Pages\TuSecurityOverview;
 use App\Filament\Resources\AuditLogResource;
 use App\Filament\Resources\GajiBerkalaResource;
+use App\Filament\Resources\GajiBerkalaResource\Pages\CreateGajiBerkala;
+use App\Filament\Resources\GajiBerkalaResource\Pages\ListGajiBerkalas;
 use App\Filament\Resources\KenaikanPangkatResource;
 use App\Filament\Resources\KenaikanPangkatResource\Pages\CreateKenaikanPangkat;
 use App\Filament\Resources\KenaikanPangkatResource\Pages\ListKenaikanPangkats;
 use App\Filament\Resources\LegalisirResource;
+use App\Filament\Resources\LegalisirResource\Pages\CreateLegalisir;
+use App\Filament\Resources\LegalisirResource\Pages\ListLegalisirs;
 use App\Filament\Resources\PegawaiResource;
 use App\Filament\Resources\PegawaiResource\Pages\CreatePegawai;
 use App\Filament\Resources\PegawaiResource\Pages\ListPegawais;
 use App\Filament\Resources\SuratKeluarResource;
+use App\Filament\Resources\SuratKeluarResource\Pages\CreateSuratKeluar;
 use App\Filament\Resources\SuratKeluarResource\Pages\ListSuratKeluars;
 use App\Filament\Resources\SuratMasukResource;
+use App\Filament\Resources\SuratMasukResource\Pages\CreateSuratMasuk;
+use App\Filament\Resources\SuratMasukResource\Pages\ListSuratMasuks;
 use App\Filament\Resources\UserResource;
 use App\Filament\Resources\UserResource\Pages\EditUser;
 use App\Filament\Widgets\WorkspaceOverviewWidget;
@@ -27,9 +34,11 @@ use App\Models\Legalisir;
 use App\Models\NotificationOutbox;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
+use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
+use App\Services\TuDataExchange;
 use App\Services\TuPersonnelExchange;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -140,7 +149,14 @@ class RoleAuthorizationTest extends TestCase
         $this->actingAs($this->user(User::ROLE_ADMIN, 'exchange-admin@test.com'));
         $this->get(TuDataExchangePage::getUrl())->assertForbidden();
         $this->get(TuPersonnelExchangePage::getUrl())->assertForbidden();
-        $this->get(TuSecurityOverview::getUrl())->assertOk();
+        $this->get(TuSecurityOverview::getUrl())
+            ->assertOk()
+            ->assertSee('tu-access-page', false)
+            ->assertSee('Akses setiap peran dalam satu tampilan')
+            ->assertSee('Hak akses per modul')
+            ->assertSee('Aktivitas perubahan terbaru')
+            ->assertSee('Lihat semua audit')
+            ->assertDontSee('Tombol aksi kustom pada Resource lama');
 
         $this->flushSession();
         $this->actingAs($this->user(User::ROLE_AUDITOR, 'exchange-auditor@test.com'));
@@ -265,6 +281,7 @@ class RoleAuthorizationTest extends TestCase
             ->assertSee('Golongan Baru (Tujuan)')
             ->assertSee('Masa Kerja (Tahun)')
             ->assertSee('Masa Kerja (Bulan)')
+            ->assertSee('Tautan Lampiran / Google Sheets (Opsional)')
             ->assertDontSee('Penyesuaian Ijazah')
             ->assertDontSee('Periode Pengajuan')
             ->assertDontSee('TMT Kenaikan Pangkat')
@@ -279,6 +296,7 @@ class RoleAuthorizationTest extends TestCase
                 'golongan_baru_id' => $golonganBaru->id,
                 'mk_tahun' => 8,
                 'mk_bulan' => 6,
+                'tautan_lampiran' => 'https://drive.google.com/file/d/kp-contoh/view',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -289,11 +307,23 @@ class RoleAuthorizationTest extends TestCase
             'golongan_baru_id' => $golonganBaru->id,
             'mk_tahun' => 8,
             'mk_bulan' => 6,
+            'tautan_lampiran' => 'https://drive.google.com/file/d/kp-contoh/view',
             'tmt' => null,
             'periode' => null,
             'nomor_sk' => null,
             'status' => 'berkas_disiapkan',
         ]);
+
+        $this->assertSame([
+            'pegawai_nip',
+            'pegawai_nama',
+            'jenis',
+            'golongan_lama_kode',
+            'golongan_baru_kode',
+            'mk_tahun',
+            'mk_bulan',
+            'tautan_lampiran',
+        ], TuPersonnelExchange::template('kp')[0]);
     }
 
     public function test_tabel_kepegawaian_mengikuti_input_baru(): void
@@ -321,9 +351,318 @@ class RoleAuthorizationTest extends TestCase
             ->assertTableColumnExists('golonganBaru.kode')
             ->assertTableColumnExists('masa_kerja')
             ->assertTableColumnExists('status')
+            ->assertTableColumnExists('document_links')
             ->assertTableColumnDoesNotExist('periode')
             ->assertTableColumnDoesNotExist('tmt')
             ->assertTableColumnDoesNotExist('nomor_sk');
+    }
+
+    public function test_form_dan_tabel_gaji_berkala_hanya_memakai_data_baru(): void
+    {
+        $golongan = RefGolongan::create([
+            'kode' => 'III/c',
+            'pangkat' => 'Penata',
+            'tingkat' => 'III',
+            'urutan' => 3,
+        ]);
+        $pegawai = Pegawai::create([
+            'nama' => 'Pegawai Pengajuan KGB',
+            'status_kepegawaian' => 'PNS',
+            'golongan_id' => $golongan->id,
+        ]);
+
+        $this->actingAs($this->user(User::ROLE_KEPEGAWAIAN, 'form-kgb@test.com'));
+
+        $this->get(GajiBerkalaResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Nama Pegawai')
+            ->assertSee('Golongan / Ruang')
+            ->assertSee('Masa Kerja (Tahun)')
+            ->assertSee('Masa Kerja (Bulan)')
+            ->assertSee('Tautan Lampiran / Google Sheets (Opsional)')
+            ->assertDontSee('TMT KGB')
+            ->assertDontSee('Gaji Pokok Lama')
+            ->assertDontSee('Gaji Pokok Baru')
+            ->assertDontSee('Nomor SK')
+            ->assertDontSee('Pejabat Penetap')
+            ->assertDontSee('Catatan Tambahan');
+
+        Livewire::test(CreateGajiBerkala::class)
+            ->fillForm([
+                'pegawai_id' => $pegawai->id,
+                'golongan_id' => $golongan->id,
+                'mk_tahun' => 9,
+                'mk_bulan' => 4,
+                'tautan_lampiran' => 'https://docs.google.com/spreadsheets/d/kgb-contoh/edit',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('gaji_berkala', [
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golongan->id,
+            'mk_tahun' => 9,
+            'mk_bulan' => 4,
+            'tautan_lampiran' => 'https://docs.google.com/spreadsheets/d/kgb-contoh/edit',
+            'tmt' => null,
+            'gaji_pokok_lama' => null,
+            'gaji_pokok_baru' => null,
+            'nomor_sk' => null,
+            'status' => 'diproses',
+        ]);
+
+        Livewire::test(ListGajiBerkalas::class)
+            ->assertTableColumnExists('mobile_summary')
+            ->assertTableColumnExists('pegawai.nama')
+            ->assertTableColumnExists('golongan.kode')
+            ->assertTableColumnExists('masa_kerja')
+            ->assertTableColumnExists('document_links')
+            ->assertTableColumnDoesNotExist('tmt')
+            ->assertTableColumnDoesNotExist('tmt_berikutnya')
+            ->assertTableColumnDoesNotExist('gaji_pokok_baru')
+            ->assertTableColumnDoesNotExist('status')
+            ->assertTableColumnDoesNotExist('nomor_sk')
+            ->assertTableActionDoesNotExist('tandai_diserahkan');
+
+        [$headers] = TuPersonnelExchange::template('kgb');
+        $this->assertSame([
+            'pegawai_nip',
+            'pegawai_nama',
+            'golongan_kode',
+            'mk_tahun',
+            'mk_bulan',
+            'tautan_lampiran',
+        ], $headers);
+
+        $csvPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'kgb-ringkas-'.uniqid().'.csv';
+        file_put_contents($csvPath, implode(PHP_EOL, [
+            'pegawai_nip,pegawai_nama,golongan_kode,mk_tahun,mk_bulan,tautan_lampiran',
+            ',Pegawai Pengajuan KGB,III/c,10,1,https://drive.google.com/file/d/kgb-impor/view',
+        ]));
+
+        try {
+            $result = TuPersonnelExchange::import('kgb', $csvPath, (int) auth()->id());
+        } finally {
+            @unlink($csvPath);
+        }
+
+        $this->assertSame(1, $result['success']);
+        $this->assertDatabaseHas('gaji_berkala', [
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golongan->id,
+            'mk_tahun' => 10,
+            'mk_bulan' => 1,
+            'tautan_lampiran' => 'https://drive.google.com/file/d/kgb-impor/view',
+            'tmt' => null,
+        ]);
+
+        $export = TuPersonnelExchange::export('kgb', 'Pegawai Pengajuan KGB', null, null);
+        $this->assertSame($headers, $export[0]);
+        $this->assertCount(3, $export);
+    }
+
+    public function test_form_legalisir_ringkas_dan_lokasi_arsip_dapat_dicari(): void
+    {
+        $this->actingAs($this->user(User::ROLE_PETUGAS_TU, 'form-legalisir@test.com'));
+
+        $this->get(LegalisirResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Lokasi Arsip Fisik / Kode Penyimpanan')
+            ->assertDontSee('Biaya Administrasi')
+            ->assertDontSee('Email Pemohon')
+            ->assertDontSee('Notifikasi Saat Siap')
+            ->assertDontSee('Nomor Dokumen');
+
+        Livewire::test(CreateLegalisir::class)
+            ->fillForm([
+                'tanggal_permohonan' => now()->format('Y-m-d'),
+                'nama_pemohon' => 'Pemohon Arsip Loker',
+                'kontak' => '081234567890',
+                'status_pemohon' => 'alumni',
+                'jenis_dokumen' => 'Ijazah',
+                'jumlah_lembar' => 2,
+                'lokasi_arsip_fisik' => 'Loker 7 / Rak C / LEG-77',
+                'status' => 'diterima',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('legalisir', [
+            'nama_pemohon' => 'Pemohon Arsip Loker',
+            'kontak' => '081234567890',
+            'email_pemohon' => null,
+            'kanal_notifikasi' => 'tidak_ada',
+            'nomor_dokumen' => null,
+            'lokasi_arsip_fisik' => 'Loker 7 / Rak C / LEG-77',
+            'biaya' => 0,
+        ]);
+        $legalisir = Legalisir::where('nama_pemohon', 'Pemohon Arsip Loker')->firstOrFail();
+
+        Livewire::test(ListLegalisirs::class)
+            ->assertTableColumnExists('lokasi_arsip_fisik')
+            ->searchTable('LEG-77')
+            ->assertCanSeeTableRecords([$legalisir]);
+
+        $this->assertContains('lokasi_arsip_fisik', TuDataExchange::template('legalisir')[0]);
+        $this->assertSame(1, TuDataExchange::query('legalisir', 'LEG-77', null, null)->count());
+
+        $export = TuDataExchange::exportRows('legalisir', 'LEG-77', null, null);
+        $locationColumn = array_search('lokasi_arsip_fisik', $export[0], true);
+        $this->assertNotFalse($locationColumn);
+        $this->assertSame('Loker 7 / Rak C / LEG-77', $export[1][$locationColumn]);
+    }
+
+    public function test_form_tabel_dan_pertukaran_surat_masuk_memakai_input_ringkas(): void
+    {
+        $classification = RefKlasifikasiSurat::create([
+            'kode' => '421.9',
+            'nama' => 'Administrasi Sekolah',
+        ]);
+        $this->actingAs($this->user(User::ROLE_PETUGAS_TU, 'form-surat-masuk@test.com'));
+
+        $this->get(SuratMasukResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Kode Klasifikasi Surat')
+            ->assertSee('Softfile Scan Surat')
+            ->assertDontSee('Perihal / Ringkasan Isi Surat')
+            ->assertDontSee('Status Surat')
+            ->assertDontSee('Sifat Surat');
+
+        Livewire::test(CreateSuratMasuk::class)
+            ->fillForm([
+                'tanggal_diterima' => '2026-10-22',
+                'nomor_surat' => 'IN/421.9/2026',
+                'tanggal_surat' => '2026-10-21',
+                'pengirim' => 'Dinas Pendidikan',
+                'klasifikasi_id' => $classification->id,
+                'lokasi_arsip_fisik' => 'Lemari A',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('surat_masuk', [
+            'nomor_surat' => 'IN/421.9/2026',
+            'pengirim' => 'Dinas Pendidikan',
+            'perihal' => '',
+            'sifat' => 'biasa',
+            'status' => 'baru',
+            'klasifikasi_id' => $classification->id,
+        ]);
+        $letter = SuratMasuk::where('nomor_surat', 'IN/421.9/2026')->firstOrFail();
+
+        Livewire::test(ListSuratMasuks::class)
+            ->assertTableColumnExists('pengirim')
+            ->assertTableColumnExists('klasifikasi.kode')
+            ->assertTableColumnExists('status')
+            ->assertTableColumnDoesNotExist('perihal')
+            ->assertTableColumnDoesNotExist('sifat');
+
+        Livewire::test(ListSuratMasuks::class)
+            ->searchTable('421.9')
+            ->assertCanSeeTableRecords([$letter]);
+
+        $this->assertSame([
+            'nomor_agenda',
+            'nomor_surat',
+            'tanggal_surat',
+            'tanggal_diterima',
+            'pengirim',
+            'kode_klasifikasi',
+            'lokasi_arsip_fisik',
+            'tautan_gform',
+        ], TuDataExchange::template('surat_masuk')[0]);
+
+        $this->assertSame(1, TuDataExchange::query('surat_masuk', '421.9', null, null)->count());
+    }
+
+    public function test_form_tabel_dan_pertukaran_surat_keluar_memakai_input_ringkas(): void
+    {
+        $classification = RefKlasifikasiSurat::create([
+            'kode' => '422.8',
+            'nama' => 'Administrasi Keluar',
+        ]);
+        $this->actingAs($this->user(User::ROLE_PETUGAS_TU, 'form-surat-keluar@test.com'));
+
+        $this->get(SuratKeluarResource::getUrl('create'))
+            ->assertOk()
+            ->assertSee('Klasifikasi &amp; Arsip Digital', false)
+            ->assertSee('Kode Klasifikasi Surat')
+            ->assertSee('Softfile Final')
+            ->assertDontSee('Perihal Surat')
+            ->assertDontSee('Sifat Surat')
+            ->assertDontSee('Penandatangan')
+            ->assertDontSee('Pembuat Konsep / Pengetik')
+            ->assertDontSee('Status Surat');
+
+        Livewire::test(CreateSuratKeluar::class)
+            ->fillForm([
+                'nomor_surat' => 'OUT/422.8/2026',
+                'tanggal_surat' => '2026-10-22',
+                'tujuan' => 'Dinas Pendidikan',
+                'klasifikasi_id' => $classification->id,
+                'lokasi_arsip_fisik' => 'Lemari B',
+            ])
+            ->call('create')
+            ->assertHasNoFormErrors();
+
+        $this->assertDatabaseHas('surat_keluar', [
+            'nomor_surat' => 'OUT/422.8/2026',
+            'tujuan' => 'Dinas Pendidikan',
+            'perihal' => '',
+            'sifat' => 'biasa',
+            'status' => 'draf',
+            'penandatangan' => null,
+            'pembuat_konsep' => null,
+            'klasifikasi_id' => $classification->id,
+        ]);
+        $letter = SuratKeluar::where('nomor_surat', 'OUT/422.8/2026')->firstOrFail();
+
+        Livewire::test(ListSuratKeluars::class)
+            ->assertTableColumnExists('tujuan')
+            ->assertTableColumnExists('klasifikasi.kode')
+            ->assertTableColumnExists('status')
+            ->assertTableColumnDoesNotExist('perihal')
+            ->assertTableColumnDoesNotExist('sifat')
+            ->searchTable('422.8')
+            ->assertCanSeeTableRecords([$letter]);
+
+        $this->assertSame([
+            'nomor_surat',
+            'tanggal_surat',
+            'tujuan',
+            'kode_klasifikasi',
+            'lokasi_arsip_fisik',
+            'tautan_gform',
+        ], TuDataExchange::template('surat_keluar')[0]);
+
+        $this->assertSame(1, TuDataExchange::query('surat_keluar', '422.8', null, null)->count());
+
+        $csvPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'surat-keluar-ringkas-'.uniqid().'.csv';
+        file_put_contents($csvPath, implode(PHP_EOL, [
+            'nomor_surat,tanggal_surat,tujuan,kode_klasifikasi,lokasi_arsip_fisik,tautan_gform',
+            'OUT/423.1/2026,2026-10-22,Kantor Cabang,423.1,Lemari C,https://drive.google.com/file/d/surat-keluar/view',
+        ]));
+
+        try {
+            $result = TuDataExchange::import('surat_keluar', $csvPath, (int) auth()->id());
+        } finally {
+            @unlink($csvPath);
+        }
+
+        $this->assertSame(1, $result['success']);
+        $this->assertDatabaseHas('ref_klasifikasi_surat', ['kode' => '423.1']);
+        $this->assertDatabaseHas('surat_keluar', [
+            'nomor_surat' => 'OUT/423.1/2026',
+            'tujuan' => 'Kantor Cabang',
+            'perihal' => '',
+            'status' => 'draf',
+            'pembuat_konsep' => null,
+        ]);
+
+        $export = TuDataExchange::exportRows('surat_keluar', '423.1', null, null);
+        $classificationColumn = array_search('kode_klasifikasi', $export[0], true);
+        $this->assertNotFalse($classificationColumn);
+        $this->assertSame('423.1', $export[1][$classificationColumn]);
     }
 
     public function test_administrator_sistem_hanya_dapat_membaca_persuratan_dan_legalisir(): void

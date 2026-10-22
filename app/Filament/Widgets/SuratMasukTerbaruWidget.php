@@ -20,6 +20,7 @@ class SuratMasukTerbaruWidget extends BaseWidget
         return $table
             ->query(
                 SuratMasuk::query()
+                    ->with('klasifikasi')
                     ->whereIn('status', ['baru', 'didisposisi'])
                     ->latest('tanggal_diterima')
                     ->limit(5)
@@ -27,10 +28,10 @@ class SuratMasukTerbaruWidget extends BaseWidget
             ->columns([
                 Tables\Columns\TextColumn::make('mobile_summary')
                     ->label('Ringkasan')
-                    ->state(fn (SuratMasuk $record): string => $record->perihal)
+                    ->state(fn (SuratMasuk $record): string => $record->pengirim)
                     ->description(fn (SuratMasuk $record): string => collect([
                         $record->nomor_agenda,
-                        $record->pengirim,
+                        $record->klasifikasi?->kode ? "Klasifikasi {$record->klasifikasi->kode}" : null,
                         $record->tanggal_diterima?->translatedFormat('d M Y'),
                         SuratMasuk::STATUSES[$record->status] ?? $record->status,
                     ])->filter()->implode(' · '))
@@ -55,19 +56,9 @@ class SuratMasukTerbaruWidget extends BaseWidget
                     ->limit(25)
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('perihal')
-                    ->label('Perihal')
-                    ->limit(45)
-                    ->visibleFrom('md'),
-
-                Tables\Columns\BadgeColumn::make('sifat')
-                    ->label('Sifat')
-                    ->colors([
-                        'gray' => 'biasa',
-                        'warning' => 'penting',
-                        'danger' => 'segera',
-                        'primary' => 'rahasia',
-                    ])
+                Tables\Columns\TextColumn::make('klasifikasi.kode')
+                    ->label('Kode Klasifikasi')
+                    ->placeholder('-')
                     ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')

@@ -25,6 +25,7 @@ class KenaikanPangkat extends Model
         'tmt',
         'mk_tahun',
         'mk_bulan',
+        'tautan_lampiran',
         'nomor_sk',
         'tanggal_sk',
         'pejabat_penetap',

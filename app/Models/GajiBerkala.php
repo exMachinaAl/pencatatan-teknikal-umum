@@ -25,6 +25,7 @@ class GajiBerkala extends Model
         'gaji_pokok_baru',
         'mk_tahun',
         'mk_bulan',
+        'tautan_lampiran',
         'nomor_sk',
         'tanggal_sk',
         'pejabat_penetap',
@@ -59,10 +60,6 @@ class GajiBerkala extends Model
 
             if (! $model->pegawai_id) {
                 throw ValidationException::withMessages(['pegawai_id' => 'Pegawai wajib dipilih.']);
-            }
-
-            if (! $model->tmt) {
-                throw ValidationException::withMessages(['tmt' => 'TMT KGB wajib diisi.']);
             }
 
             if (! $model->tmt_berikutnya && $model->tmt) {
@@ -106,22 +103,33 @@ class GajiBerkala extends Model
                 throw ValidationException::withMessages(['gaji_pokok_baru' => 'Gaji pokok baru tidak boleh lebih kecil dari gaji lama.']);
             }
 
-            $date = Carbon::parse($model->tmt)->toDateString();
-            if (Carbon::parse($model->tmt_berikutnya)->lte(Carbon::parse($date))) {
+            $date = $model->tmt ? Carbon::parse($model->tmt)->toDateString() : null;
+            if ($date && $model->tmt_berikutnya && Carbon::parse($model->tmt_berikutnya)->lte(Carbon::parse($date))) {
                 throw ValidationException::withMessages(['tmt_berikutnya' => 'TMT berikutnya harus setelah TMT KGB.']);
             }
 
+            $integrityKey = static::integrityKey(
+                (int) $model->pegawai_id,
+                $date,
+                $model->golongan_id ? (int) $model->golongan_id : null,
+                (int) $model->mk_tahun,
+                (int) $model->mk_bulan,
+            );
             $duplicate = static::withTrashed()
-                ->where('pegawai_id', $model->pegawai_id)
-                ->whereDate('tmt', $date)
+                ->where('integrity_key', $integrityKey)
                 ->when($model->exists, fn ($query) => $query->whereKeyNot($model->getKey()))
                 ->exists();
 
             if ($duplicate) {
-                throw ValidationException::withMessages(['tmt' => 'Riwayat KGB dengan pegawai dan TMT yang sama sudah ada.']);
+                $field = $date ? 'tmt' : 'mk_tahun';
+                $message = $date
+                    ? 'Riwayat KGB dengan pegawai dan TMT yang sama sudah ada.'
+                    : 'Data KGB dengan pegawai, golongan, dan masa kerja yang sama sudah ada.';
+
+                throw ValidationException::withMessages([$field => $message]);
             }
 
-            $model->integrity_key = static::integrityKey((int) $model->pegawai_id, $date);
+            $model->integrity_key = $integrityKey;
         });
 
         static::saved(function (GajiBerkala $model): void {
@@ -140,9 +148,18 @@ class GajiBerkala extends Model
         });
     }
 
-    public static function integrityKey(int $pegawaiId, string $tmt): string
-    {
-        return hash('sha256', implode('|', ['kgb', $pegawaiId, Carbon::parse($tmt)->toDateString()]));
+    public static function integrityKey(
+        int $pegawaiId,
+        ?string $tmt = null,
+        ?int $golonganId = null,
+        int $mkTahun = 0,
+        int $mkBulan = 0,
+    ): string {
+        $period = $tmt
+            ? Carbon::parse($tmt)->toDateString()
+            : "golongan:{$golonganId}:masa-kerja:{$mkTahun}:{$mkBulan}";
+
+        return hash('sha256', implode('|', ['kgb', $pegawaiId, $period]));
     }
 
     public function pegawai(): BelongsTo

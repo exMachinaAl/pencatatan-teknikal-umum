@@ -3,7 +3,7 @@
         <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900 sm:p-7">
             <p class="text-sm font-medium text-primary-700 dark:text-primary-300">Cari lintas layanan</p>
             <h2 class="mt-1 text-xl font-semibold text-gray-950 dark:text-white">Temukan berkas dari satu tempat</h2>
-            <p class="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Nomor surat, agenda, pengirim, tujuan, perihal, nomor antrean, atau nama pemohon.</p>
+            <p class="mt-2 max-w-2xl text-sm text-gray-600 dark:text-gray-400">Nomor surat, agenda, pengirim, tujuan, kode klasifikasi, lokasi arsip fisik, nomor antrean, atau nama pemohon.</p>
             <div class="mt-5 max-w-3xl">
                 <x-filament::input.wrapper prefix-icon="heroicon-m-magnifying-glass">
                     <x-filament::input

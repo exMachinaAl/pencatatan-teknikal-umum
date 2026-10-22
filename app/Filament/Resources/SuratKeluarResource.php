@@ -62,43 +62,37 @@ class SuratKeluarResource extends Resource
                             ->maxLength(200)
                             ->columnSpanFull(),
 
-                        Forms\Components\Textarea::make('perihal')
-                            ->label('Perihal Surat')
-                            ->required()
-                            ->rows(3)
-                            ->columnSpanFull(),
                     ])->columns(2),
 
-                Forms\Components\Section::make('Klasifikasi & Pejabat')
-                    ->collapsible()
-                    ->collapsed()
+                Forms\Components\Section::make('Klasifikasi & Arsip Digital')
+                    ->description('Isi kode klasifikasi dan lampiran arsip dalam satu bagian. Kode baru dapat ditambahkan langsung bila belum tersedia.')
                     ->schema([
                         Forms\Components\Select::make('klasifikasi_id')
-                            ->label('Klasifikasi Surat')
+                            ->label('Kode Klasifikasi Surat')
                             ->relationship('klasifikasi', 'kode')
                             ->getOptionLabelFromRecordUsing(fn (RefKlasifikasiSurat $record) => "{$record->kode} - {$record->nama}")
-                            ->searchable()
-                            ->preload(),
+                            ->searchable(['kode', 'nama'])
+                            ->preload()
+                            ->helperText('Ketik kode atau nama untuk mencari. Jika belum tersedia, tambahkan kode baru dari tombol pada input ini.')
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('kode')
+                                    ->label('Kode Klasifikasi Baru')
+                                    ->required()
+                                    ->maxLength(30),
+                                Forms\Components\TextInput::make('nama')
+                                    ->label('Nama Klasifikasi')
+                                    ->maxLength(150)
+                                    ->helperText('Opsional. Jika kosong, nama akan mengikuti kode.'),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                $kode = trim((string) $data['kode']);
+                                $nama = trim((string) ($data['nama'] ?? ''));
 
-                        Forms\Components\Select::make('sifat')
-                            ->label('Sifat Surat')
-                            ->options(SuratKeluar::SIFAT)
-                            ->default('biasa')
-                            ->required(),
-
-                        Forms\Components\TextInput::make('penandatangan')
-                            ->label('Penandatangan')
-                            ->default('Drs. H. Mulyadi, M.Pd (Kepala Sekolah)'),
-
-                        Forms\Components\TextInput::make('pembuat_konsep')
-                            ->label('Pembuat Konsep / Pengetik')
-                            ->placeholder('Nama staf yang mengetik draf'),
-
-                        Forms\Components\Select::make('status')
-                            ->label('Status Surat')
-                            ->options(SuratKeluar::STATUSES)
-                            ->default('draf')
-                            ->required(),
+                                return (int) RefKlasifikasiSurat::firstOrCreate(
+                                    ['kode' => $kode],
+                                    ['nama' => $nama !== '' ? $nama : $kode],
+                                )->getKey();
+                            }),
 
                         Forms\Components\TextInput::make('lokasi_arsip_fisik')
                             ->label('Lokasi Arsip Fisik')
@@ -117,6 +111,8 @@ class SuratKeluarResource extends Resource
                             ->label('Tautan Google Drive / Sheets / Lampiran')
                             ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
                             ->url()
+                            ->rules(['nullable', 'starts_with:https://'])
+                            ->maxLength(500)
                             ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
                             ->columnSpanFull(),
                     ])->columns(2),
@@ -129,9 +125,9 @@ class SuratKeluarResource extends Resource
                         Forms\Components\Select::make('suratMasukTerkait')
                             ->label('Membalas Surat Masuk')
                             ->relationship('suratMasukTerkait', 'nomor_surat')
-                            ->getOptionLabelFromRecordUsing(fn ($record) => ($record->nomor_surat ?: 'Tanpa nomor surat').' — '.$record->pengirim.' — '.$record->perihal." (Agenda: {$record->nomor_agenda})")
+                            ->getOptionLabelFromRecordUsing(fn ($record) => ($record->nomor_surat ?: 'Tanpa nomor surat').' — '.$record->pengirim." (Agenda: {$record->nomor_agenda})")
                             ->multiple()
-                            ->searchable(['nomor_surat', 'nomor_agenda', 'pengirim', 'perihal'])
+                            ->searchable(['nomor_surat', 'nomor_agenda', 'pengirim'])
                             ->preload()
                             ->columnSpanFull(),
                         Forms\Components\Select::make('metode_pengiriman')
@@ -165,10 +161,10 @@ class SuratKeluarResource extends Resource
                 Tables\Columns\ViewColumn::make('mobile_summary')
                     ->label('Ringkasan')
                     ->view('filament.tables.columns.document-mobile-summary', fn (SuratKeluar $record): array => [
-                        'title' => $record->perihal,
+                        'title' => $record->tujuan,
                         'meta' => collect([
                             $record->nomor_surat ?: 'Tanpa nomor',
-                            $record->tujuan,
+                            $record->klasifikasi?->kode ? "Klasifikasi {$record->klasifikasi->kode}" : null,
                             $record->tanggal_surat?->translatedFormat('d M Y'),
                             SuratKeluar::STATUSES[$record->status] ?? $record->status,
                         ])->filter()->implode(' · '),
@@ -184,13 +180,6 @@ class SuratKeluarResource extends Resource
                     ->weight('bold')
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('perihal')
-                    ->label('Perihal')
-                    ->searchable()
-                    ->limit(48)
-                    ->wrap()
-                    ->visibleFrom('md'),
-
                 Tables\Columns\TextColumn::make('tujuan')
                     ->label('Tujuan')
                     ->searchable()
@@ -200,15 +189,10 @@ class SuratKeluarResource extends Resource
                     ->description(fn (SuratKeluar $record) => $record->tanggal_surat?->translatedFormat('d M Y'))
                     ->visibleFrom('md'),
 
-                Tables\Columns\BadgeColumn::make('sifat')
-                    ->label('Sifat')
-                    ->colors([
-                        'gray' => 'biasa',
-                        'warning' => 'penting',
-                        'danger' => 'segera',
-                        'primary' => 'rahasia',
-                    ])
-                    ->formatStateUsing(fn ($state) => SuratKeluar::SIFAT[$state] ?? $state)
+                Tables\Columns\TextColumn::make('klasifikasi.kode')
+                    ->label('Kode Klasifikasi')
+                    ->searchable(['kode', 'nama'])
+                    ->placeholder('-')
                     ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
@@ -228,20 +212,18 @@ class SuratKeluarResource extends Resource
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
                     ->visibleFrom('md'),
             ])
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['lampiran', 'klasifikasi']))
             ->defaultSort('tanggal_surat', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status Surat')
                     ->options(SuratKeluar::STATUSES),
 
-                Tables\Filters\SelectFilter::make('sifat')
-                    ->label('Sifat Surat')
-                    ->options(SuratKeluar::SIFAT),
-
                 Tables\Filters\SelectFilter::make('klasifikasi_id')
                     ->label('Klasifikasi')
-                    ->relationship('klasifikasi', 'kode'),
+                    ->relationship('klasifikasi', 'kode')
+                    ->searchable()
+                    ->preload(),
 
                 Tables\Filters\Filter::make('periode_surat')
                     ->form([
@@ -349,15 +331,13 @@ class SuratKeluarResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['Nomor Surat', 'Tanggal', 'Tujuan', 'Perihal', 'Sifat', 'Penandatangan', 'Status', 'Lokasi Arsip']);
+                                fputcsv($handle, ['Nomor Surat', 'Tanggal', 'Tujuan', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->nomor_surat,
                                         $row->tanggal_surat?->format('Y-m-d'),
                                         $row->tujuan,
-                                        $row->perihal,
-                                        $row->sifat,
-                                        $row->penandatangan,
+                                        $row->klasifikasi?->kode,
                                         $row->status,
                                         $row->lokasi_arsip_fisik,
                                     ]);

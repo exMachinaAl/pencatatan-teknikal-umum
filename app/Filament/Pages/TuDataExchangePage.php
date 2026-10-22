@@ -21,18 +21,29 @@ class TuDataExchangePage extends Page implements HasForms
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-arrow-path-rounded-square';
+
     protected static ?string $navigationGroup = 'Pengaturan & Utilitas';
+
     protected static ?string $navigationLabel = 'Export & Import Data';
+
     protected static ?string $title = 'Export & Import Administrasi';
+
     protected static ?int $navigationSort = 2;
+
     protected static string $view = 'filament.pages.tu-data-exchange';
 
     public ?array $data = [];
+
     public ?array $preview = null;
+
     public ?array $result = null;
+
     public ?string $previewPath = null;
+
     public ?string $previewModule = null;
+
     public ?string $previewHash = null;
+
     public ?string $previewProof = null;
 
     public static function canAccess(): bool
@@ -116,12 +127,12 @@ class TuDataExchangePage extends Page implements HasForms
                     Forms\Components\Select::make('module')->label('Modul administrasi')
                         ->options(fn (): array => $this->allowedModules())->required()->live(),
                     Forms\Components\Select::make('format')->label('Format ekspor / template')
-                        ->options(['csv'=>'CSV (bisa dibuka Excel)','xlsx'=>'Excel (.xlsx, membutuhkan ekstensi zip PHP)'])->required(),
+                        ->options(['csv' => 'CSV (bisa dibuka Excel)', 'xlsx' => 'Excel (.xlsx, membutuhkan ekstensi zip PHP)'])->required(),
                 ])->columns(2),
             Forms\Components\Section::make('Filter ekspor')
                 ->description('Filter berlaku pada ekspor di halaman ini, bukan otomatis dari tabel Resource. Kosongkan untuk semua data.')
                 ->schema([
-                    Forms\Components\TextInput::make('search')->label('Cari nomor / nama / perihal')->maxLength(120),
+                    Forms\Components\TextInput::make('search')->label('Cari nomor / nama / pengirim / klasifikasi / lokasi arsip')->maxLength(120),
                     Forms\Components\DatePicker::make('start')->label('Dari tanggal'),
                     Forms\Components\DatePicker::make('end')->label('Sampai tanggal'),
                 ])->columns(3),
@@ -130,7 +141,7 @@ class TuDataExchangePage extends Page implements HasForms
                 ->schema([
                     Forms\Components\FileUpload::make('file')->label('Berkas CSV atau XLSX')->disk('local')
                         ->directory(fn (): string => 'tu-exchange/temp/'.Auth::id())->visibility('private')
-                        ->acceptedFileTypes(['text/csv','text/plain','application/csv','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
+                        ->acceptedFileTypes(['text/csv', 'text/plain', 'application/csv', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'])
                         ->maxSize(5120)->helperText('Download template terlebih dahulu agar susunan kolom tepat.'),
                 ])->visible(fn (Forms\Get $get): bool => $this->canImport($get('module'))),
         ])->statePath('data');
@@ -144,7 +155,8 @@ class TuDataExchangePage extends Page implements HasForms
             abort_unless($this->canImport($module) || $this->canExport($module), 403);
             $rows = TuDataExchange::template($module);
             $file = 'template-tu-'.$module.'.'.$state['format'];
-            return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows,$file) : TuDataExchange::csvDownload($rows,$file);
+
+            return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows, $file) : TuDataExchange::csvDownload($rows, $file);
         } catch (Throwable $e) {
             Notification::make()->title('Gagal membuat template')->body($e->getMessage())->danger()->send();
         }
@@ -154,11 +166,12 @@ class TuDataExchangePage extends Page implements HasForms
     {
         try {
             $state = $this->form->getState();
-            $module = (string)$state['module'];
+            $module = (string) $state['module'];
             $this->authorizeModule($module, 'export');
-            $rows = TuDataExchange::exportRows($module,$state['search'] ?? null,$state['start'] ?? null,$state['end'] ?? null);
+            $rows = TuDataExchange::exportRows($module, $state['search'] ?? null, $state['start'] ?? null, $state['end'] ?? null);
             $filename = 'ekspor-tu-'.$module.'-'.date('Ymd-His').'.'.$state['format'];
-            return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows,$filename) : TuDataExchange::csvDownload($rows,$filename);
+
+            return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows, $filename) : TuDataExchange::csvDownload($rows, $filename);
         } catch (Throwable $e) {
             Notification::make()->title('Ekspor gagal')->body($e->getMessage())->danger()->send();
         }
@@ -167,34 +180,37 @@ class TuDataExchangePage extends Page implements HasForms
     private function secureUploadPath(string $path): string
     {
         $directory = 'tu-exchange/temp/'.Auth::id();
-        if (!str_starts_with($path,$directory.'/') || str_contains($path,'..') || str_contains($path,'\\')) {
+        if (! str_starts_with($path, $directory.'/') || str_contains($path, '..') || str_contains($path, '\\')) {
             throw new RuntimeException('Lokasi berkas impor tidak sah.');
         }
         $full = Storage::disk('local')->path($path);
         $real = realpath($full);
         $root = realpath(Storage::disk('local')->path($directory));
-        if (!$real || !$root || !str_starts_with($real, $root.DIRECTORY_SEPARATOR)) {
+        if (! $real || ! $root || ! str_starts_with($real, $root.DIRECTORY_SEPARATOR)) {
             throw new RuntimeException('Berkas tidak berada di folder impor privat.');
         }
+
         return $real;
     }
 
     public function previewImport(): void
     {
-        $this->reset(['preview','result','previewPath','previewModule','previewHash','previewProof']);
+        $this->reset(['preview', 'result', 'previewPath', 'previewModule', 'previewHash', 'previewProof']);
         try {
             $state = $this->form->getState();
             $module = (string) $state['module'];
             $this->authorizeModule($module, 'import');
             $path = $state['file'] ?? null;
-            if (!is_string($path) || $path === '') throw new RuntimeException('Pilih berkas terlebih dahulu.');
+            if (! is_string($path) || $path === '') {
+                throw new RuntimeException('Pilih berkas terlebih dahulu.');
+            }
             $file = $this->secureUploadPath($path);
-            $analyzed = TuDataExchange::analyze($module,$file);
+            $analyzed = TuDataExchange::analyze($module, $file);
             unset($analyzed['rows']); // Data penuh TIDAK disimpan di state Livewire / browser.
             $this->preview = $analyzed;
             $this->previewPath = $path;
             $this->previewModule = $module;
-            $this->previewHash = hash_file('sha256',$file);
+            $this->previewHash = hash_file('sha256', $file);
             $this->previewProof = $this->proof();
             Notification::make()->title('Pratinjau selesai: belum ada data yang disimpan.')->success()->send();
         } catch (Throwable $e) {
@@ -204,26 +220,30 @@ class TuDataExchangePage extends Page implements HasForms
 
     private function proof(): string
     {
-        return hash_hmac('sha256', implode('|', [Auth::id(),$this->previewPath,$this->previewModule,$this->previewHash]),(string)config('app.key'));
+        return hash_hmac('sha256', implode('|', [Auth::id(), $this->previewPath, $this->previewModule, $this->previewHash]), (string) config('app.key'));
     }
 
     public function commitImport(): void
     {
         try {
-            if (!$this->preview || !$this->previewPath || !$this->previewHash || !$this->previewProof) {
+            if (! $this->preview || ! $this->previewPath || ! $this->previewHash || ! $this->previewProof) {
                 throw new RuntimeException('Jalankan pratinjau sebelum impor.');
             }
             $this->authorizeModule((string) $this->previewModule, 'import');
-            if (!hash_equals($this->proof(),$this->previewProof)) throw new RuntimeException('Token pratinjau tidak cocok.');
+            if (! hash_equals($this->proof(), $this->previewProof)) {
+                throw new RuntimeException('Token pratinjau tidak cocok.');
+            }
             $path = $this->secureUploadPath($this->previewPath);
-            if (!hash_equals($this->previewHash,hash_file('sha256',$path))) {
+            if (! hash_equals($this->previewHash, hash_file('sha256', $path))) {
                 throw new RuntimeException('Berkas berubah setelah pratinjau. Unggah dan pratinjau ulang.');
             }
-            if (($this->preview['invalid'] ?? 1) > 0) throw new RuntimeException('Masih ada baris tidak valid. Perbaiki file lalu pratinjau ulang.');
-            $this->result = TuDataExchange::import((string)$this->previewModule,$path,(int)Auth::id());
+            if (($this->preview['invalid'] ?? 1) > 0) {
+                throw new RuntimeException('Masih ada baris tidak valid. Perbaiki file lalu pratinjau ulang.');
+            }
+            $this->result = TuDataExchange::import((string) $this->previewModule, $path, (int) Auth::id());
             // Hapus hanya file unggahan milik sesi ini; tidak menghapus arsip/surat di storage lainnya.
             Storage::disk('local')->delete($this->previewPath);
-            $this->reset(['preview','previewPath','previewModule','previewHash','previewProof']);
+            $this->reset(['preview', 'previewPath', 'previewModule', 'previewHash', 'previewProof']);
             $this->form->fill([
                 'module' => $this->data['module'] ?? array_key_first($this->allowedModules()),
                 'format' => $this->data['format'] ?? 'csv',

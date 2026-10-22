@@ -36,9 +36,9 @@ class GoogleFormImportSecurityTest extends TestCase
         $this->actingAs($user);
 
         $upload = UploadedFile::fake()->createWithContent('surat.csv', implode("\n", [
-            'tanggal_diterima,pengirim,perihal,nomor_surat,sifat,tautan_gform',
-            '2026-10-19,Dinas Pendidikan,Undangan Rapat,001/DP/X/2026,penting,https://example.test/surat',
-            'tanggal-salah,Dinas Kesehatan,Pemberitahuan,002/DK/X/2026,biasa,',
+            'tanggal_diterima,pengirim,nomor_surat,kode_klasifikasi,lokasi_arsip_fisik,tautan_gform',
+            '2026-10-19,Dinas Pendidikan,001/DP/X/2026,421.1,Lemari A,https://example.test/surat',
+            'tanggal-salah,Dinas Kesehatan,002/DK/X/2026,421.2,Lemari B,',
         ]));
 
         $component = Livewire::test(GoogleFormImport::class)
@@ -60,8 +60,13 @@ class GoogleFormImportSecurityTest extends TestCase
         $this->assertDatabaseHas('surat_masuk', [
             'pengirim' => 'Dinas Pendidikan',
             'tanggal_diterima' => '2026-10-19 00:00:00',
+            'perihal' => '',
+            'sifat' => 'biasa',
+            'status' => 'baru',
+            'lokasi_arsip_fisik' => 'Lemari A',
             'created_by' => $user->id,
         ]);
+        $this->assertDatabaseHas('ref_klasifikasi_surat', ['kode' => '421.1']);
         $this->assertDatabaseMissing('surat_masuk', ['pengirim' => 'Dinas Kesehatan']);
         $this->assertDatabaseHas('import_gform_log', [
             'modul' => 'surat_masuk',
@@ -79,8 +84,8 @@ class GoogleFormImportSecurityTest extends TestCase
         $this->actingAs($user);
 
         $upload = UploadedFile::fake()->createWithContent('surat-keluar.csv', implode("\n", [
-            'nomor_surat,tanggal_surat,tujuan,perihal,pembuat_konsep,tautan_gform',
-            '421.1/044/SEKOLAH/2027,2027-02-12,Dinas Pendidikan,Laporan bulanan,Petugas TU,',
+            'nomor_surat,tanggal_surat,tujuan,kode_klasifikasi,lokasi_arsip_fisik,tautan_gform',
+            '421.1/044/SEKOLAH/2027,2027-02-12,Dinas Pendidikan,421.1,Lemari B,',
         ]));
 
         Livewire::test(GoogleFormImport::class)
@@ -95,6 +100,40 @@ class GoogleFormImportSecurityTest extends TestCase
 
         $this->assertSame(2027, $surat->tahun);
         $this->assertNull($surat->nomor_urut);
+        $this->assertSame('', $surat->perihal);
+        $this->assertSame('biasa', $surat->sifat);
+        $this->assertSame('draf', $surat->status);
+        $this->assertNull($surat->penandatangan);
+        $this->assertNull($surat->pembuat_konsep);
+        $this->assertSame('421.1', $surat->klasifikasi?->kode);
+    }
+
+    public function test_impor_legalisir_menyimpan_lokasi_arsip_tanpa_email_dan_notifikasi(): void
+    {
+        $user = $this->user(User::ROLE_PETUGAS_TU);
+        $this->actingAs($user);
+
+        $upload = UploadedFile::fake()->createWithContent('legalisir.csv', implode("\n", [
+            'tanggal_permohonan,nama_pemohon,kontak,status_pemohon,jenis_dokumen,jumlah_lembar,lokasi_arsip_fisik,catatan',
+            '2026-10-22,Pemohon Legalisir,081200000001,alumni,Ijazah,2,Loker 9 / Rak A / LEG-9,Berkas lengkap',
+        ]));
+
+        Livewire::test(GoogleFormImport::class)
+            ->fillForm(['modul' => 'legalisir', 'file' => [$upload]])
+            ->call('parseCsv')
+            ->assertSet('step', 2)
+            ->call('processImport')
+            ->assertSet('step', 3)
+            ->assertSet('importResult.success', 1);
+
+        $this->assertDatabaseHas('legalisir', [
+            'nama_pemohon' => 'Pemohon Legalisir',
+            'kontak' => '081200000001',
+            'email_pemohon' => null,
+            'kanal_notifikasi' => 'tidak_ada',
+            'nomor_dokumen' => null,
+            'lokasi_arsip_fisik' => 'Loker 9 / Rak A / LEG-9',
+        ]);
     }
 
     private function user(string $role): User

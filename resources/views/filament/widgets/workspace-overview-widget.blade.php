@@ -52,9 +52,9 @@
 
                     @if ($suratMasuk)
                         <p class="tu-letter-number">{{ $suratMasuk->nomor_agenda }}</p>
-                        <h3>{{ $suratMasuk->perihal }}</h3>
+                        <h3>{{ $suratMasuk->pengirim }}</h3>
                         <p class="tu-letter-meta">
-                            {{ $suratMasuk->pengirim }}
+                            {{ $suratMasuk->klasifikasi?->kode ? 'Klasifikasi '.$suratMasuk->klasifikasi->kode : 'Tanpa klasifikasi' }}
                             <span aria-hidden="true">·</span>
                             {{ $suratMasuk->tanggal_diterima?->translatedFormat('d M Y') }}
                         </p>
@@ -79,9 +79,9 @@
 
                     @if ($suratKeluar)
                         <p class="tu-letter-number">{{ $suratKeluar->nomor_surat }}</p>
-                        <h3>{{ $suratKeluar->perihal }}</h3>
+                        <h3>{{ $suratKeluar->tujuan }}</h3>
                         <p class="tu-letter-meta">
-                            {{ $suratKeluar->tujuan }}
+                            {{ $suratKeluar->klasifikasi?->kode ? 'Klasifikasi '.$suratKeluar->klasifikasi->kode : 'Tanpa klasifikasi' }}
                             <span aria-hidden="true">·</span>
                             {{ $suratKeluar->tanggal_surat?->translatedFormat('d M Y') }}
                         </p>

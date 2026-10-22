@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\AuditLog;
 use App\Models\ImportGformLog;
 use App\Models\Legalisir;
+use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
@@ -12,7 +13,6 @@ use Carbon\CarbonImmutable;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Section;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
@@ -47,13 +47,21 @@ class GoogleFormImport extends Page implements HasForms
     public ?array $data = [];
 
     public int $step = 1;
+
     public ?string $modul = null;
+
     public ?string $filePath = null;
+
     public ?string $fileHash = null;
+
     public ?string $fileProof = null;
+
     public array $csvHeaders = [];
+
     public array $csvPreviewRows = [];
+
     public array $columnMapping = [];
+
     public array $importResult = [];
 
     public function mount(): void
@@ -182,6 +190,7 @@ class GoogleFormImport extends Page implements HasForms
 
         if (! $uploaded) {
             Notification::make()->title('Silakan pilih file CSV terlebih dahulu.')->danger()->send();
+
             return;
         }
 
@@ -261,9 +270,9 @@ class GoogleFormImport extends Page implements HasForms
             return [
                 'tanggal_diterima' => 'Tanggal Masuk / Timestamp Form',
                 'pengirim' => 'Nama Pengirim / Instansi Asal',
-                'perihal' => 'Perihal / Isi Surat',
                 'nomor_surat' => 'Nomor Surat Asal (Jika Ada)',
-                'sifat' => 'Sifat Surat (Biasa/Penting)',
+                'kode_klasifikasi' => 'Kode Klasifikasi Surat',
+                'lokasi_arsip_fisik' => 'Lokasi Arsip Fisik',
                 'tautan_gform' => 'Tautan Berkas Drive / Dokumen',
             ];
         }
@@ -273,8 +282,8 @@ class GoogleFormImport extends Page implements HasForms
                 'nomor_surat' => 'Nomor Surat Resmi',
                 'tanggal_surat' => 'Tanggal Surat / Timestamp',
                 'tujuan' => 'Tujuan Surat / Instansi Tujuan',
-                'perihal' => 'Perihal Surat',
-                'pembuat_konsep' => 'Pemohon / Pembuat Konsep',
+                'kode_klasifikasi' => 'Kode Klasifikasi Surat',
+                'lokasi_arsip_fisik' => 'Lokasi Arsip Fisik',
                 'tautan_gform' => 'Tautan Draf File Drive',
             ];
         }
@@ -287,6 +296,7 @@ class GoogleFormImport extends Page implements HasForms
             'status_pemohon' => 'Status (Alumni/Siswa/Wali)',
             'jenis_dokumen' => 'Jenis Dokumen (Ijazah/SKHUN)',
             'jumlah_lembar' => 'Jumlah Lembar',
+            'lokasi_arsip_fisik' => 'Lokasi Arsip Fisik / Kode Penyimpanan',
             'catatan' => 'Catatan Tambahan',
         ];
     }
@@ -376,13 +386,12 @@ class GoogleFormImport extends Page implements HasForms
         DB::transaction(function () use ($rowValues): void {
             if ($this->modul === 'surat_masuk') {
                 $pengirim = $this->cleanText($rowValues['pengirim'], 'Pengirim', 200, true);
-                $perihal = $this->cleanText($rowValues['perihal'], 'Perihal', 300, true);
                 $nomorSurat = $this->cleanText($rowValues['nomor_surat'], 'Nomor surat', 100);
                 $tanggalDiterima = $this->cleanDate($rowValues['tanggal_diterima'], 'Tanggal diterima');
+                $kodeKlasifikasi = $this->cleanText($rowValues['kode_klasifikasi'], 'Kode klasifikasi', 30);
 
                 $duplicate = SuratMasuk::withTrashed()
                     ->where('pengirim', $pengirim)
-                    ->where('perihal', $perihal)
                     ->when($nomorSurat, fn ($query) => $query->where('nomor_surat', $nomorSurat))
                     ->whereDate('tanggal_diterima', $tanggalDiterima)
                     ->exists();
@@ -391,18 +400,19 @@ class GoogleFormImport extends Page implements HasForms
                     throw new RuntimeException("Duplikat surat masuk dari {$pengirim}.");
                 }
 
-                $sifat = strtolower((string) ($rowValues['sifat'] ?? ''));
                 SuratMasuk::create([
                     'nomor_agenda' => SuratMasuk::generateNomorAgenda((int) substr($tanggalDiterima, 0, 4)),
                     'nomor_surat' => $nomorSurat,
                     'tanggal_surat' => $tanggalDiterima,
                     'tanggal_diterima' => $tanggalDiterima,
                     'pengirim' => $pengirim,
-                    'perihal' => $perihal,
-                    'sifat' => in_array($sifat, ['penting', 'segera', 'rahasia'], true) ? $sifat : 'biasa',
+                    'klasifikasi_id' => $kodeKlasifikasi === null ? null : RefKlasifikasiSurat::firstOrCreate(
+                        ['kode' => $kodeKlasifikasi],
+                        ['nama' => $kodeKlasifikasi],
+                    )->getKey(),
+                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
                     'tautan_gform' => $this->cleanUrl($rowValues['tautan_gform']),
                     'sumber' => 'gform_import',
-                    'status' => 'baru',
                     'created_by' => Auth::id(),
                 ]);
 
@@ -412,8 +422,8 @@ class GoogleFormImport extends Page implements HasForms
             if ($this->modul === 'surat_keluar') {
                 $nomorSurat = $this->cleanText($rowValues['nomor_surat'], 'Nomor surat resmi', 100, true);
                 $tujuan = $this->cleanText($rowValues['tujuan'], 'Tujuan', 200, true);
-                $perihal = $this->cleanText($rowValues['perihal'], 'Perihal', 300, true);
                 $tanggalSurat = $this->cleanDate($rowValues['tanggal_surat'], 'Tanggal surat');
+                $kodeKlasifikasi = $this->cleanText($rowValues['kode_klasifikasi'], 'Kode klasifikasi', 30);
 
                 if (SuratKeluar::withTrashed()->where('nomor_surat', $nomorSurat)->exists()) {
                     throw new RuntimeException("Nomor surat keluar {$nomorSurat} sudah tercatat.");
@@ -423,11 +433,13 @@ class GoogleFormImport extends Page implements HasForms
                     'nomor_surat' => $nomorSurat,
                     'tanggal_surat' => $tanggalSurat,
                     'tujuan' => $tujuan,
-                    'perihal' => $perihal,
-                    'pembuat_konsep' => $this->cleanText($rowValues['pembuat_konsep'], 'Pembuat konsep', 150) ?? 'Google Form Import',
+                    'klasifikasi_id' => $kodeKlasifikasi === null ? null : RefKlasifikasiSurat::firstOrCreate(
+                        ['kode' => $kodeKlasifikasi],
+                        ['nama' => $kodeKlasifikasi],
+                    )->getKey(),
+                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
                     'tautan_gform' => $this->cleanUrl($rowValues['tautan_gform']),
                     'sumber' => 'gform_import',
-                    'status' => 'draf',
                     'created_by' => Auth::id(),
                 ]);
 
@@ -463,6 +475,7 @@ class GoogleFormImport extends Page implements HasForms
                 'status_pemohon' => in_array($statusPemohon, ['alumni', 'siswa', 'wali', 'lainnya'], true) ? $statusPemohon : 'alumni',
                 'jenis_dokumen' => $jenisDokumen,
                 'jumlah_lembar' => (int) $jumlahLembar,
+                'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
                 'tanggal_permohonan' => $tanggalPermohonan,
                 'catatan' => $this->cleanText($rowValues['catatan'], 'Catatan', 20000),
                 'status' => 'diterima',
@@ -478,6 +491,7 @@ class GoogleFormImport extends Page implements HasForms
 
         if (! $this->filePath || ! $this->fileHash || ! $this->fileProof) {
             Notification::make()->title('Pratinjau CSV tidak valid. Unggah ulang berkas.')->danger()->send();
+
             return;
         }
 

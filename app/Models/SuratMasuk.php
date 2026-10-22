@@ -60,6 +60,7 @@ class SuratMasuk extends Model
     protected static function booted(): void
     {
         static::saving(function (SuratMasuk $surat): void {
+            $surat->perihal ??= '';
             $surat->sifat ??= 'biasa';
             $surat->status ??= 'baru';
 

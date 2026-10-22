@@ -12,7 +12,7 @@ class UserSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_seeder_tidak_menimpa_password_role_atau_status_akun_yang_sudah_ada(): void
+    public function test_seeder_mereset_password_tetapi_tidak_menimpa_role_atau_status_akun_yang_sudah_ada(): void
     {
         $existing = User::create([
             'name' => 'Admin Existing',
@@ -25,7 +25,7 @@ class UserSeederTest extends TestCase
         $this->seed(UserSeeder::class);
 
         $existing->refresh();
-        $this->assertTrue(Hash::check('rahasia-yang-sudah-diganti', $existing->password));
+        $this->assertTrue(Hash::check('password', $existing->password));
         $this->assertSame(User::ROLE_AUDITOR, $existing->role);
         $this->assertFalse($existing->is_active);
         $this->assertSame('admin', $existing->username);
@@ -36,7 +36,7 @@ class UserSeederTest extends TestCase
         ]);
     }
 
-    public function test_menjalankan_seeder_ulang_tidak_mereset_password(): void
+    public function test_menjalankan_seeder_ulang_mereset_password(): void
     {
         $this->seed(UserSeeder::class);
 
@@ -45,25 +45,17 @@ class UserSeederTest extends TestCase
 
         $this->seed(UserSeeder::class);
 
-        $this->assertTrue(Hash::check('password-baru-yang-aman', $kepala->refresh()->password));
+        $this->assertTrue(Hash::check('password', $kepala->refresh()->password));
         $this->assertDatabaseCount('users', 5);
     }
 
-    public function test_seeder_memakai_password_dan_username_masing_masing_role(): void
+    public function test_seluruh_akun_bawaan_memakai_password_yang_sama(): void
     {
-        config()->set('app.initial_user_passwords', [
-            'admin_sistem' => 'Admin-Aman-123',
-            'kepala_tu' => 'Kepala-TU-123',
-            'kepala_sekolah' => 'Kepala-Sekolah-123',
-            'petugas_tu' => 'Petugas-TU-123',
-            'pegawai' => 'Pegawai-Aman-123',
-        ]);
-
         $this->seed(UserSeeder::class);
 
-        $admin = User::where('username', 'admin')->firstOrFail();
-        $kepalaTu = User::where('username', 'kepala_tu')->firstOrFail();
-        $this->assertTrue(Hash::check('Admin-Aman-123', $admin->password));
-        $this->assertTrue(Hash::check('Kepala-TU-123', $kepalaTu->password));
+        foreach (['admin', 'kepala_tu', 'kepala_sekolah', 'staf_tu', 'pegawai'] as $username) {
+            $user = User::where('username', $username)->firstOrFail();
+            $this->assertTrue(Hash::check('password', $user->password), "Password {$username} tidak sesuai.");
+        }
     }
 }

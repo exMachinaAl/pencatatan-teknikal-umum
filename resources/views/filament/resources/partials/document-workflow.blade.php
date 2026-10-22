@@ -68,7 +68,7 @@
                     @php($url = $item instanceof \App\Models\SuratMasuk ? \App\Filament\Resources\SuratMasukResource::getUrl('view', ['record' => $item]) : \App\Filament\Resources\SuratKeluarResource::getUrl('view', ['record' => $item]))
                     <a href="{{ $url }}" class="block rounded-xl border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800">
                         <span class="font-medium text-gray-950 dark:text-white">{{ $item->nomor_agenda ?? $item->nomor_surat }}</span>
-                        <span class="mt-1 block truncate text-sm text-gray-500">{{ $item->perihal }}</span>
+                        <span class="mt-1 block truncate text-sm text-gray-500">{{ $item instanceof \App\Models\SuratMasuk ? $item->pengirim : $item->tujuan }}</span>
                     </a>
                 @empty
                     <p class="text-sm text-gray-500">Belum ada surat yang dihubungkan.</p>

@@ -10,9 +10,11 @@ use App\Models\Lampiran;
 use App\Models\LampiranAccessLog;
 use App\Models\Legalisir;
 use App\Models\NotificationOutbox;
+use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
+use App\Services\TuDataExchange;
 use App\Support\DocumentAttachmentLink;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -200,46 +202,102 @@ class DocumentWorkflowTest extends TestCase
         $local = SuratMasuk::create([
             'tanggal_diterima' => now(),
             'pengirim' => 'Dinas Pendidikan',
-            'perihal' => 'Surat dengan file lokal',
             'file_path' => 'arsip_surat_masuk/tabel.pdf',
         ]);
         SuratMasuk::create([
             'tanggal_diterima' => now(),
             'pengirim' => 'Kecamatan',
-            'perihal' => 'Surat dengan Google Sheets',
             'tautan_gform' => 'https://docs.google.com/spreadsheets/d/contoh/edit',
         ]);
 
         $localLinks = DocumentAttachmentLink::links($local->fresh(), $local->tautan_gform);
         $this->assertSame('Lihat file', $localLinks[0]['label']);
+        $this->assertSame('Unduh file', $localLinks[1]['label']);
         $this->assertStringContainsString('/lampiran/', $localLinks[0]['url']);
-        $this->assertCount(1, DocumentAttachmentLink::links($local->fresh(['lampiran']), 'http://example.test/tidak-aman'));
+        $this->assertStringContainsString('/download', $localLinks[1]['url']);
+        $this->assertCount(2, DocumentAttachmentLink::links($local->fresh(['lampiran']), 'http://example.test/tidak-aman'));
 
         Livewire::test(ListSuratMasuks::class)
             ->assertSee('Lihat file')
+            ->assertSee('Unduh file')
             ->assertSee('Google Sheets')
-            ->assertSee('Surat dengan file lokal')
-            ->assertSee('Surat dengan Google Sheets');
+            ->assertSee('Dinas Pendidikan')
+            ->assertSee('Kecamatan');
     }
 
-    public function test_pencarian_terpadu_mencari_nomor_pengirim_tujuan_perihal_dan_pemohon(): void
+    public function test_tautan_lampiran_ikut_template_impor_dan_ekspor(): void
+    {
+        $user = $this->user();
+        $this->actingAs($user);
+
+        [$headers] = TuDataExchange::template('surat_masuk');
+        $this->assertContains('tautan_gform', $headers);
+        $this->assertContains('tautan_gform', TuDataExchange::template('surat_keluar')[0]);
+        $this->assertContains('tautan_lampiran', TuDataExchange::template('legalisir')[0]);
+
+        $csvPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'surat-tautan-'.uniqid().'.csv';
+        file_put_contents($csvPath, implode(PHP_EOL, [
+            'tanggal_diterima,pengirim,kode_klasifikasi,tautan_gform',
+            '2026-10-21,Dinas Pendidikan,421.2,https://docs.google.com/spreadsheets/d/hasil-rapat/edit',
+        ]));
+
+        try {
+            $result = TuDataExchange::import('surat_masuk', $csvPath, (int) $user->id);
+        } finally {
+            @unlink($csvPath);
+        }
+
+        $this->assertSame(1, $result['success']);
+        $this->assertDatabaseHas('surat_masuk', [
+            'pengirim' => 'Dinas Pendidikan',
+            'perihal' => '',
+            'tautan_gform' => 'https://docs.google.com/spreadsheets/d/hasil-rapat/edit',
+        ]);
+        $this->assertDatabaseHas('ref_klasifikasi_surat', ['kode' => '421.2']);
+
+        $export = TuDataExchange::exportRows('surat_masuk', '421.2', null, null);
+        $linkColumn = array_search('tautan_gform', $export[0], true);
+        $classificationColumn = array_search('kode_klasifikasi', $export[0], true);
+        $this->assertNotFalse($linkColumn);
+        $this->assertNotFalse($classificationColumn);
+        $this->assertSame('421.2', $export[1][$classificationColumn]);
+        $this->assertSame('https://docs.google.com/spreadsheets/d/hasil-rapat/edit', $export[1][$linkColumn]);
+    }
+
+    public function test_pencarian_terpadu_mencari_nomor_pengirim_klasifikasi_tujuan_dan_pemohon(): void
     {
         $this->actingAs($this->user());
+        $classification = RefKlasifikasiSurat::create([
+            'kode' => '421.77',
+            'nama' => 'Klasifikasi Khusus',
+        ]);
+        $outgoingClassification = RefKlasifikasiSurat::create([
+            'kode' => '422.78',
+            'nama' => 'Klasifikasi Surat Keluar',
+        ]);
         SuratMasuk::create([
             'nomor_agenda' => 'SM/2026/0991', 'nomor_surat' => 'KHUSUS-ALFA',
-            'tanggal_diterima' => now(), 'pengirim' => 'Instansi Anggrek', 'perihal' => 'Agenda kebersihan',
+            'tanggal_diterima' => now(), 'pengirim' => 'Instansi Anggrek',
+            'klasifikasi_id' => $classification->id,
         ]);
         SuratKeluar::create([
             'nomor_surat' => 'SK-KHUSUS-BETA', 'nomor_urut' => 992, 'tahun' => 2026,
-            'tanggal_surat' => now(), 'tujuan' => 'Kantor Melati', 'perihal' => 'Konfirmasi kegiatan',
+            'tanggal_surat' => now(), 'tujuan' => 'Kantor Melati',
+            'klasifikasi_id' => $outgoingClassification->id,
         ]);
-        $this->legalisir(['nama_pemohon' => 'Pemohon Cempaka']);
+        $this->legalisir([
+            'nama_pemohon' => 'Pemohon Cempaka',
+            'lokasi_arsip_fisik' => 'Loker Cempaka 12',
+        ]);
 
-        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Anggrek')->assertSee('Agenda kebersihan');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Anggrek')->assertSee('Instansi Anggrek');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', '421.77')->assertSee('Instansi Anggrek');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'KHUSUS-ALFA')->assertSee('KHUSUS-ALFA');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'SM/2026/0991')->assertSee('KHUSUS-ALFA');
-        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Melati')->assertSee('Konfirmasi kegiatan');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Melati')->assertSee('Kantor Melati');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', '422.78')->assertSee('Kantor Melati');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'Cempaka')->assertSee('Pemohon Cempaka');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Loker Cempaka')->assertSee('Pemohon Cempaka');
     }
 
     private function user(string $role = User::ROLE_PETUGAS_TU): User

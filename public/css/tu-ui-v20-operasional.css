@@ -86,7 +86,7 @@
 .tu-document-link svg { flex:0 0 auto; }
 .tu-document-link span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .tu-document-empty { color:#94a3b8; font-size:.75rem; }
-.tu-document-links--compact { flex-direction:row; justify-content:center; }
+.tu-document-links--compact { flex-direction:row; flex-wrap:wrap; justify-content:center; }
 .tu-document-link--compact { justify-content:center; min-width:2rem; min-height:2rem; padding:.35rem; }
 /* Keep row action anchor visible near right edge, also in horizontally scrolled tables. */
 .fi-ta-table tbody td.fi-ta-actions-cell { padding-inline-start:.75rem !important; }

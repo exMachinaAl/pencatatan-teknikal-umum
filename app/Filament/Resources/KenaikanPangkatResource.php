@@ -12,6 +12,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
@@ -96,6 +97,15 @@ class KenaikanPangkatResource extends Resource
                             ->default(0)
                             ->required()
                             ->native(false),
+
+                        Forms\Components\TextInput::make('tautan_lampiran')
+                            ->label('Tautan Lampiran / Google Sheets (Opsional)')
+                            ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
+                            ->url()
+                            ->rules(['nullable', 'starts_with:https://'])
+                            ->maxLength(500)
+                            ->helperText('Isi jika berkas berada di Google Drive, Google Sheets, atau layanan HTTPS lain.')
+                            ->columnSpanFull(),
                     ])->columns(2),
             ]);
     }
@@ -104,19 +114,20 @@ class KenaikanPangkatResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('mobile_summary')
+                Tables\Columns\ViewColumn::make('mobile_summary')
                     ->label('Ringkasan')
-                    ->state(fn (KenaikanPangkat $record): string => $record->pegawai?->nama ?: 'Pegawai tidak tersedia')
-                    ->description(fn (KenaikanPangkat $record): string => collect([
-                        $record->pegawai?->nip ?: 'Non-NIP',
-                        KenaikanPangkat::jenisLabel($record->jenis),
-                        collect([$record->golonganLama?->kode, $record->golonganBaru?->kode])->filter()->implode(' → '),
-                        "Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln",
-                        KenaikanPangkat::STATUSES[$record->status] ?? $record->status,
-                    ])->filter()->implode(' · '))
-                    ->weight('bold')
-                    ->wrap()
-                    ->extraAttributes(['class' => 'tu-mobile-summary'])
+                    ->view('filament.tables.columns.document-mobile-summary', fn (KenaikanPangkat $record): array => [
+                        'title' => $record->pegawai?->nama ?: 'Pegawai tidak tersedia',
+                        'meta' => collect([
+                            $record->pegawai?->nip ?: 'Non-NIP',
+                            KenaikanPangkat::jenisLabel($record->jenis),
+                            collect([$record->golonganLama?->kode, $record->golonganBaru?->kode])->filter()->implode(' → '),
+                            "Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln",
+                            KenaikanPangkat::STATUSES[$record->status] ?? $record->status,
+                        ])->filter()->implode(' · '),
+                        'externalAttribute' => 'tautan_lampiran',
+                    ])
+                    ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
                     ->hiddenFrom('md'),
 
                 Tables\Columns\TextColumn::make('pegawai.nama')
@@ -166,7 +177,14 @@ class KenaikanPangkatResource extends Resource
                     ->sortable()
                     ->visibleFrom('md'),
 
+                Tables\Columns\ViewColumn::make('document_links')
+                    ->label('Lampiran')
+                    ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
+                    ->extraCellAttributes(['class' => 'tu-document-cell'])
+                    ->visibleFrom('md'),
+
             ])
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status Proses')
@@ -224,7 +242,7 @@ class KenaikanPangkatResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Status']);
+                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Tautan Lampiran', 'Status']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->pegawai?->nip,
@@ -234,6 +252,7 @@ class KenaikanPangkatResource extends Resource
                                         $row->golonganBaru?->kode,
                                         $row->mk_tahun,
                                         $row->mk_bulan,
+                                        $row->tautan_lampiran,
                                         $row->status,
                                     ]);
                                 }

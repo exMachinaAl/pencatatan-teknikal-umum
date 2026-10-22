@@ -237,6 +237,48 @@ class DataIntegrityTest extends TestCase
         ]), 'mk_tahun');
     }
 
+    public function test_kgb_tanpa_tmt_memakai_golongan_dan_masa_kerja_sebagai_identitas(): void
+    {
+        [$golongan, $golonganLain] = $this->golonganPair();
+        $pegawai = Pegawai::create([
+            'nama' => 'Pegawai KGB Ringkas',
+            'golongan_id' => $golongan->id,
+        ]);
+
+        $kgb = GajiBerkala::create([
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golongan->id,
+            'mk_tahun' => 9,
+            'mk_bulan' => 4,
+        ]);
+
+        $this->assertNull($kgb->tmt);
+        $this->assertSame(9, $kgb->mk_tahun);
+        $this->assertSame(4, $kgb->mk_bulan);
+        $this->assertNotNull($kgb->integrity_key);
+
+        $this->assertValidationFails(fn () => GajiBerkala::create([
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golongan->id,
+            'mk_tahun' => 9,
+            'mk_bulan' => 4,
+        ]), 'mk_tahun');
+
+        GajiBerkala::create([
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golonganLain->id,
+            'mk_tahun' => 9,
+            'mk_bulan' => 4,
+        ]);
+
+        GajiBerkala::create([
+            'pegawai_id' => $pegawai->id,
+            'golongan_id' => $golongan->id,
+            'mk_tahun' => 9,
+            'mk_bulan' => 5,
+        ]);
+    }
+
     public function test_tanggal_dan_nominal_ditolak_jika_melanggar_urutan_bisnis(): void
     {
         $this->assertValidationFails(fn () => SuratMasuk::create([

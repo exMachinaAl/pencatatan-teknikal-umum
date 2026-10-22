@@ -66,18 +66,6 @@ class LegalisirResource extends Resource
                             ->maxLength(60)
                             ->placeholder('08xxxxxxxxxx'),
 
-                        Forms\Components\TextInput::make('email_pemohon')
-                            ->label('Email Pemohon')
-                            ->email()
-                            ->rule('not_regex:/[\r\n]/')
-                            ->maxLength(150),
-
-                        Forms\Components\Select::make('kanal_notifikasi')
-                            ->label('Notifikasi Saat Siap')
-                            ->options(Legalisir::KANAL_NOTIFIKASI)
-                            ->default('tidak_ada')
-                            ->required(),
-
                         Forms\Components\Select::make('status_pemohon')
                             ->label('Status Pemohon')
                             ->options(Legalisir::STATUS_PEMOHON)
@@ -90,9 +78,11 @@ class LegalisirResource extends Resource
                             ->default('Ijazah')
                             ->required(),
 
-                        Forms\Components\TextInput::make('nomor_dokumen')
-                            ->label('Nomor Dokumen')
-                            ->maxLength(120),
+                        Forms\Components\TextInput::make('lokasi_arsip_fisik')
+                            ->label('Lokasi Arsip Fisik / Kode Penyimpanan')
+                            ->placeholder('Contoh: Loker 2 / Rak B / Kode LEG-2026')
+                            ->helperText('Gunakan penamaan yang mudah dicari kembali melalui tabel dan pencarian terpadu.')
+                            ->maxLength(150),
 
                         Forms\Components\TextInput::make('tahun_lulus')
                             ->label('Tahun Lulus')
@@ -108,14 +98,6 @@ class LegalisirResource extends Resource
                             ->maxValue(10000)
                             ->required(),
 
-                        Forms\Components\TextInput::make('biaya')
-                            ->label('Biaya Administrasi (Rp)')
-                            ->numeric()
-                            ->default(0)
-                            ->minValue(0)
-                            ->maxValue(9999999999.99)
-                            ->prefix('Rp')
-                            ->helperText('Gratis (Rp 0) untuk layanan sekolah negeri standar'),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Status Pemrosesan & Pengambilan')
@@ -176,6 +158,8 @@ class LegalisirResource extends Resource
                             ->label('Tautan Google Drive / Sheets / Lampiran')
                             ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
                             ->url()
+                            ->rules(['nullable', 'starts_with:https://'])
+                            ->maxLength(500)
                             ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
                             ->columnSpanFull(),
 
@@ -204,6 +188,7 @@ class LegalisirResource extends Resource
                         'meta' => collect([
                             $record->nomor_antrean ?: $record->nomor_legalisir,
                             trim("{$record->jenis_dokumen} · {$record->jumlah_lembar} lembar"),
+                            $record->lokasi_arsip_fisik,
                             $record->tanggal_permohonan?->translatedFormat('d M Y'),
                             Legalisir::STATUSES[$record->status] ?? $record->status,
                         ])->filter()->implode(' · '),
@@ -271,10 +256,11 @@ class LegalisirResource extends Resource
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('pengambil')
-                    ->label('Diambil Oleh')
-                    ->placeholder('Belum diambil')
-                    ->limit(20)
+                Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
+                    ->label('Lokasi Arsip')
+                    ->searchable()
+                    ->placeholder('-')
+                    ->limit(28)
                     ->visibleFrom('md'),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
@@ -392,7 +378,7 @@ class LegalisirResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['No Registrasi', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Jumlah Lembar', 'Tgl Permohonan', 'Tgl Selesai', 'Tgl Diambil', 'Pengambil', 'Status']);
+                                fputcsv($handle, ['No Registrasi', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Jumlah Lembar', 'Lokasi Arsip', 'Tgl Permohonan', 'Tgl Selesai', 'Tgl Diambil', 'Pengambil', 'Status']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->nomor_legalisir,
@@ -401,6 +387,7 @@ class LegalisirResource extends Resource
                                         $row->status_pemohon,
                                         $row->jenis_dokumen,
                                         $row->jumlah_lembar,
+                                        $row->lokasi_arsip_fisik,
                                         $row->tanggal_permohonan?->format('Y-m-d'),
                                         $row->tanggal_selesai?->format('Y-m-d'),
                                         $row->tanggal_diambil?->format('Y-m-d'),

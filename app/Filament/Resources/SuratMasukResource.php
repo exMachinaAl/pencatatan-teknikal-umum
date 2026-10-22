@@ -71,35 +71,37 @@ class SuratMasukResource extends Resource
                             ->maxLength(200)
                             ->columnSpanFull(),
 
-                        Forms\Components\Textarea::make('perihal')
-                            ->label('Perihal / Ringkasan Isi Surat')
-                            ->required()
-                            ->rows(3)
-                            ->columnSpanFull(),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Klasifikasi & Arsip Digital')
-                    ->collapsible()
-                    ->collapsed()
+                    ->description('Isi kode klasifikasi dan lampiran arsip dalam satu bagian. Kode baru dapat ditambahkan langsung bila belum tersedia.')
                     ->schema([
                         Forms\Components\Select::make('klasifikasi_id')
                             ->label('Kode Klasifikasi Surat')
                             ->relationship('klasifikasi', 'kode')
                             ->getOptionLabelFromRecordUsing(fn (RefKlasifikasiSurat $record) => "{$record->kode} - {$record->nama}")
-                            ->searchable()
-                            ->preload(),
+                            ->searchable(['kode', 'nama'])
+                            ->preload()
+                            ->helperText('Ketik kode atau nama untuk mencari. Jika belum tersedia, tambahkan kode baru dari tombol pada input ini.')
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('kode')
+                                    ->label('Kode Klasifikasi Baru')
+                                    ->required()
+                                    ->maxLength(30),
+                                Forms\Components\TextInput::make('nama')
+                                    ->label('Nama Klasifikasi')
+                                    ->maxLength(150)
+                                    ->helperText('Opsional. Jika kosong, nama akan mengikuti kode.'),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                $kode = trim((string) $data['kode']);
+                                $nama = trim((string) ($data['nama'] ?? ''));
 
-                        Forms\Components\Select::make('sifat')
-                            ->label('Sifat Surat')
-                            ->options(SuratMasuk::SIFAT)
-                            ->default('biasa')
-                            ->required(),
-
-                        Forms\Components\Select::make('status')
-                            ->label('Status Surat')
-                            ->options(SuratMasuk::STATUSES)
-                            ->default('baru')
-                            ->required(),
+                                return (int) RefKlasifikasiSurat::firstOrCreate(
+                                    ['kode' => $kode],
+                                    ['nama' => $nama !== '' ? $nama : $kode],
+                                )->getKey();
+                            }),
 
                         Forms\Components\TextInput::make('lokasi_arsip_fisik')
                             ->label('Lokasi Arsip Fisik')
@@ -118,6 +120,8 @@ class SuratMasukResource extends Resource
                             ->label('Tautan Google Drive / Sheets / Lampiran')
                             ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
                             ->url()
+                            ->rules(['nullable', 'starts_with:https://'])
+                            ->maxLength(500)
                             ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
                             ->columnSpanFull(),
                     ])->columns(2),
@@ -185,10 +189,10 @@ class SuratMasukResource extends Resource
                 Tables\Columns\ViewColumn::make('mobile_summary')
                     ->label('Ringkasan')
                     ->view('filament.tables.columns.document-mobile-summary', fn (SuratMasuk $record): array => [
-                        'title' => $record->perihal,
+                        'title' => $record->pengirim,
                         'meta' => collect([
                             $record->nomor_surat ?: 'Tanpa nomor',
-                            $record->pengirim,
+                            $record->klasifikasi?->kode ? "Klasifikasi {$record->klasifikasi->kode}" : null,
                             $record->tanggal_diterima?->translatedFormat('d M Y'),
                             SuratMasuk::STATUSES[$record->status] ?? $record->status,
                         ])->filter()->implode(' · '),
@@ -206,13 +210,6 @@ class SuratMasukResource extends Resource
                     ->description(fn (SuratMasuk $record) => "Agenda: {$record->nomor_agenda}")
                     ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('perihal')
-                    ->label('Perihal')
-                    ->searchable()
-                    ->limit(48)
-                    ->wrap()
-                    ->visibleFrom('md'),
-
                 Tables\Columns\TextColumn::make('pengirim')
                     ->label('Pengirim')
                     ->searchable()
@@ -222,15 +219,10 @@ class SuratMasukResource extends Resource
                     ->description(fn (SuratMasuk $record) => $record->tanggal_diterima?->translatedFormat('d M Y'))
                     ->visibleFrom('md'),
 
-                Tables\Columns\BadgeColumn::make('sifat')
-                    ->label('Sifat')
-                    ->colors([
-                        'gray' => 'biasa',
-                        'warning' => 'penting',
-                        'danger' => 'segera',
-                        'primary' => 'rahasia',
-                    ])
-                    ->formatStateUsing(fn ($state) => SuratMasuk::SIFAT[$state] ?? $state)
+                Tables\Columns\TextColumn::make('klasifikasi.kode')
+                    ->label('Kode Klasifikasi')
+                    ->searchable(['kode', 'nama'])
+                    ->placeholder('-')
                     ->visibleFrom('md'),
 
                 Tables\Columns\BadgeColumn::make('status')
@@ -258,20 +250,18 @@ class SuratMasukResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->visibleFrom('md'),
             ])
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['lampiran', 'klasifikasi']))
             ->defaultSort('tanggal_diterima', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
                     ->label('Status Surat')
                     ->options(SuratMasuk::STATUSES),
 
-                Tables\Filters\SelectFilter::make('sifat')
-                    ->label('Sifat Surat')
-                    ->options(SuratMasuk::SIFAT),
-
                 Tables\Filters\SelectFilter::make('klasifikasi_id')
                     ->label('Klasifikasi')
-                    ->relationship('klasifikasi', 'kode'),
+                    ->relationship('klasifikasi', 'kode')
+                    ->searchable()
+                    ->preload(),
 
                 Tables\Filters\Filter::make('periode_diterima')
                     ->form([
@@ -331,7 +321,7 @@ class SuratMasukResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Perihal', 'Sifat', 'Status', 'Lokasi Arsip']);
+                                fputcsv($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
                                 foreach ($records as $row) {
                                     fputcsv($handle, [
                                         $row->nomor_agenda,
@@ -339,8 +329,7 @@ class SuratMasukResource extends Resource
                                         $row->tanggal_surat?->format('Y-m-d'),
                                         $row->tanggal_diterima?->format('Y-m-d'),
                                         $row->pengirim,
-                                        $row->perihal,
-                                        $row->sifat,
+                                        $row->klasifikasi?->kode,
                                         $row->status,
                                         $row->lokasi_arsip_fisik,
                                     ]);
