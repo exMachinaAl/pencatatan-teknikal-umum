@@ -52,6 +52,12 @@ class GajiBerkala extends Model
         'diserahkan' => 'Diserahkan',
     ];
 
+    private const STATUS_TRANSITIONS = [
+        'diproses' => 'sk_terbit',
+        'sk_terbit' => 'diserahkan',
+        'diserahkan' => null,
+    ];
+
     protected static function booted(): void
     {
         static::saving(function (GajiBerkala $model): void {
@@ -69,6 +75,15 @@ class GajiBerkala extends Model
 
             if (! array_key_exists((string) $model->status, self::STATUSES)) {
                 throw ValidationException::withMessages(['status' => 'Status KGB tidak valid.']);
+            }
+
+            if ($model->exists && $model->isDirty('status')) {
+                $expected = self::STATUS_TRANSITIONS[(string) $model->getOriginal('status')] ?? null;
+                if ($model->status !== $expected) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Status KGB harus dilanjutkan satu tahap sesuai urutan proses.',
+                    ]);
+                }
             }
 
             foreach (['nomor_sk' => 100, 'pejabat_penetap' => 150, 'catatan' => 20000] as $field => $maximum) {
@@ -199,5 +214,10 @@ class GajiBerkala extends Model
     public function scopePerluTindakLanjut(Builder $query): Builder
     {
         return $query->jatuhTempo()->where('status', '!=', 'diserahkan');
+    }
+
+    public function nextStatus(): ?string
+    {
+        return self::STATUS_TRANSITIONS[$this->status] ?? null;
     }
 }

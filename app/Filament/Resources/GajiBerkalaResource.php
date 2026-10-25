@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\GajiBerkala;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
+use App\Support\ConcurrentRecordUpdate;
 use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -110,6 +111,7 @@ class GajiBerkalaResource extends Resource
                             $record->pegawai?->nip ?: 'Non-NIP',
                             $record->golongan?->kode ? "Gol. {$record->golongan->kode}" : null,
                             "Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln",
+                            GajiBerkala::STATUSES[$record->status] ?? $record->status,
                         ])->filter()->implode(' · '),
                         'externalAttribute' => 'tautan_lampiran',
                     ])
@@ -135,6 +137,16 @@ class GajiBerkalaResource extends Resource
                     ->state(fn (GajiBerkala $record) => "{$record->mk_tahun} Thn {$record->mk_bulan} Bln")
                     ->visibleFrom('md'),
 
+                Tables\Columns\BadgeColumn::make('status')
+                    ->label('Status Proses')
+                    ->formatStateUsing(fn (string $state): string => GajiBerkala::STATUSES[$state] ?? $state)
+                    ->colors([
+                        'warning' => 'diproses',
+                        'info' => 'sk_terbit',
+                        'success' => 'diserahkan',
+                    ])
+                    ->visibleFrom('md'),
+
                 Tables\Columns\ViewColumn::make('document_links')
                     ->label('Lampiran')
                     ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
@@ -143,9 +155,13 @@ class GajiBerkalaResource extends Resource
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
             ->filters([
-                Tables\Filters\Filter::make('perlu_tindak_lanjut')
-                    ->label('Jatuh tempo dan belum diserahkan')
-                    ->query(fn (Builder $query) => $query->perluTindakLanjut()),
+                Tables\Filters\Filter::make('proses_aktif')
+                    ->label('Proses belum diserahkan')
+                    ->query(fn (Builder $query) => $query->where('status', '!=', 'diserahkan')),
+
+                Tables\Filters\SelectFilter::make('status')
+                    ->label('Status Proses')
+                    ->options(GajiBerkala::STATUSES),
 
                 Tables\Filters\SelectFilter::make('golongan_id')
                     ->label('Golongan')
@@ -157,6 +173,19 @@ class GajiBerkalaResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
+                    Tables\Actions\Action::make('lanjutkan_status')
+                        ->label(fn (GajiBerkala $record): string => 'Lanjut ke '.(GajiBerkala::STATUSES[$record->nextStatus()] ?? 'Tahap Berikutnya'))
+                        ->icon('heroicon-o-forward')
+                        ->requiresConfirmation()
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (GajiBerkala $record): bool => $record->nextStatus() !== null)
+                        ->action(function (GajiBerkala $record): void {
+                            static::authorizeResourceAction('transition');
+                            ConcurrentRecordUpdate::run($record, fn (GajiBerkala $locked) => $locked->update([
+                                'status' => $locked->nextStatus(),
+                            ]));
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])

@@ -29,7 +29,7 @@ class UserSeederTest extends TestCase
         $this->assertSame(User::ROLE_AUDITOR, $existing->role);
         $this->assertFalse($existing->is_active);
         $this->assertSame('admin', $existing->username);
-        $this->assertDatabaseCount('users', 5);
+        $this->assertDatabaseCount('users', 7);
         $this->assertDatabaseHas('users', [
             'email' => 'kepala.tu@tu.sekolah.sch.id',
             'role' => User::ROLE_KEPALA_TU,
@@ -46,14 +46,14 @@ class UserSeederTest extends TestCase
         $this->seed(UserSeeder::class);
 
         $this->assertTrue(Hash::check('password-baru-yang-aman', $kepala->refresh()->password));
-        $this->assertDatabaseCount('users', 5);
+        $this->assertDatabaseCount('users', 7);
     }
 
     public function test_akun_bawaan_lokal_memakai_fallback_password_pengembangan(): void
     {
         $this->seed(UserSeeder::class);
 
-        foreach (['admin', 'kepala_tu', 'kepala_sekolah', 'staf_tu', 'pegawai'] as $username) {
+        foreach (['admin', 'kepala_tu', 'kepala_sekolah', 'staf_tu', 'kepegawaian', 'auditor', 'pegawai'] as $username) {
             $user = User::where('username', $username)->firstOrFail();
             $this->assertTrue(Hash::check('password', $user->password), "Password {$username} tidak sesuai.");
         }

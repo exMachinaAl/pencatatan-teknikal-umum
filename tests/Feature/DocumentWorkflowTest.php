@@ -10,6 +10,7 @@ use App\Models\Lampiran;
 use App\Models\LampiranAccessLog;
 use App\Models\Legalisir;
 use App\Models\NotificationOutbox;
+use App\Models\Pegawai;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
@@ -61,12 +62,12 @@ class DocumentWorkflowTest extends TestCase
             'data_sekolah_cocok' => true,
         ]);
 
+        $legalisir->update(['status' => 'diproses']);
         $legalisir->update(['status' => 'siap_diambil']);
         $this->assertDatabaseCount('notification_outbox', 2);
         $this->assertEqualsCanonicalizing(['email', 'whatsapp'], NotificationOutbox::pluck('kanal')->all());
 
-        $legalisir->update(['status' => 'diproses']);
-        $legalisir->update(['status' => 'siap_diambil']);
+        $legalisir->antrekanNotifikasiSiapDiambil();
         $this->assertDatabaseCount('notification_outbox', 2);
     }
 
@@ -81,6 +82,7 @@ class DocumentWorkflowTest extends TestCase
             'data_sekolah_cocok' => true,
         ]);
 
+        $legalisir->update(['status' => 'diproses']);
         $legalisir->update(['status' => 'siap_diambil']);
 
         $this->assertDatabaseCount('notification_outbox', 0);
@@ -134,6 +136,11 @@ class DocumentWorkflowTest extends TestCase
 
         $this->assertTrue($disposisi->fresh()->is_terlambat);
         $this->assertTrue(Disposisi::terlambat()->whereKey($disposisi)->exists());
+        $this->assertSame('didisposisi', $masuk->refresh()->status);
+
+        $disposisi->update(['status' => 'selesai', 'catatan_tindak_lanjut' => 'Laporan selesai.']);
+        $this->assertNotNull($disposisi->refresh()->selesai_pada);
+        $this->assertSame('selesai', $masuk->refresh()->status);
         $this->assertTrue($keluar->suratMasukTerkait()->whereKey($masuk)->exists());
         $this->assertTrue(AuditLog::where('entitas', 'SuratMasuk')->where('entitas_id', $masuk->id)->where('aksi', 'disposisi_ditambahkan')->exists());
     }
@@ -176,7 +183,7 @@ class DocumentWorkflowTest extends TestCase
         Storage::disk('local')->put('profil_pegawai/anggota.png', $png);
 
         $kepalaTu->update(['foto_path' => 'profil_pengguna/kepala.png']);
-        $pegawai = \App\Models\Pegawai::create([
+        $pegawai = Pegawai::create([
             'nama' => 'Anggota dengan Foto',
             'foto_path' => 'profil_pegawai/anggota.png',
         ]);

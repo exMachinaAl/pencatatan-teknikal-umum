@@ -17,6 +17,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Response;
+use Illuminate\Validation\ValidationException;
 
 class SuratMasukResource extends Resource
 {
@@ -289,7 +290,7 @@ class SuratMasukResource extends Resource
                         ->icon('heroicon-o-archive-box')
                         ->color('gray')
                         ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (SuratMasuk $record): bool => $record->status !== 'diarsipkan')
+                        ->visible(fn (SuratMasuk $record): bool => in_array($record->status, ['baru', 'selesai'], true))
                         ->form([
                             Forms\Components\TextInput::make('lokasi_arsip_fisik')
                                 ->label('Lokasi Fisik Arsip')
@@ -298,11 +299,19 @@ class SuratMasukResource extends Resource
                         ])
                         ->action(function (SuratMasuk $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, fn (SuratMasuk $locked) => $locked->update([
-                                'status' => 'diarsipkan',
-                                'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
-                                'diarsipkan_pada' => now(),
-                            ]));
+                            ConcurrentRecordUpdate::run($record, function (SuratMasuk $locked) use ($data): void {
+                                if (! in_array($locked->status, ['baru', 'selesai'], true)) {
+                                    throw ValidationException::withMessages([
+                                        'status' => 'Surat belum dapat diarsipkan karena disposisi masih berjalan.',
+                                    ]);
+                                }
+
+                                $locked->update([
+                                    'status' => 'diarsipkan',
+                                    'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
+                                    'diarsipkan_pada' => now(),
+                                ]);
+                            });
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),

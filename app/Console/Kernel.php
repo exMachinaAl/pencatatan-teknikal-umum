@@ -12,6 +12,10 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
+        $schedule->command('app:sync-effective-promotions')
+            ->dailyAt('00:15')
+            ->withoutOverlapping();
+
         $schedule->command('app:backup-database --retain=30')
             ->dailyAt('01:30')
             ->withoutOverlapping();

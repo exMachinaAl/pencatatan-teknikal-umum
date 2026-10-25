@@ -15,8 +15,8 @@ use App\Filament\Resources\SuratMasukResource;
 use App\Filament\Resources\UserResource;
 use App\Models\Disposisi;
 use App\Models\GajiBerkala;
+use App\Models\KenaikanPangkat;
 use App\Models\Legalisir;
-use App\Models\Pegawai;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use Filament\Widgets\Widget;
@@ -55,37 +55,37 @@ class WorkspaceOverviewWidget extends Widget
         $moduleDefinitions = [
             [
                 'label' => 'Surat Masuk',
-                'description' => 'Agenda dan disposisi',
+                'description' => 'Pencatatan, disposisi, dan arsip',
                 'icon' => 'heroicon-o-inbox-arrow-down',
                 'resource' => SuratMasukResource::class,
             ],
             [
                 'label' => 'Surat Keluar',
-                'description' => 'Konsep dan arsip',
+                'description' => 'Penerbitan, pengiriman, dan arsip',
                 'icon' => 'heroicon-o-paper-airplane',
                 'resource' => SuratKeluarResource::class,
             ],
             [
                 'label' => 'Pegawai',
-                'description' => 'Data kepegawaian',
+                'description' => 'Identitas dan golongan pegawai',
                 'icon' => 'heroicon-o-users',
                 'resource' => PegawaiResource::class,
             ],
             [
                 'label' => 'Kenaikan Pangkat',
-                'description' => 'Usulan dan status',
+                'description' => 'Pengajuan dan tahapan status',
                 'icon' => 'heroicon-o-arrow-trending-up',
                 'resource' => KenaikanPangkatResource::class,
             ],
             [
                 'label' => 'Gaji Berkala',
-                'description' => 'Jadwal KGB',
+                'description' => 'Pengajuan dan tahapan status',
                 'icon' => 'heroicon-o-banknotes',
                 'resource' => GajiBerkalaResource::class,
             ],
             [
                 'label' => 'Legalisir',
-                'description' => 'Permohonan layanan',
+                'description' => 'Permohonan, verifikasi, serah terima',
                 'icon' => 'heroicon-o-document-check',
                 'resource' => LegalisirResource::class,
             ],
@@ -119,15 +119,31 @@ class WorkspaceOverviewWidget extends Widget
         $attention = [];
 
         if ($canViewLegalisir) {
-            $attention[] = [
-                'label' => 'Legalisir menunggu proses',
-                'count' => Legalisir::perluTindakLanjut()->count(),
-                'detail' => 'permohonan perlu diverifikasi',
-                'url' => LegalisirResource::getUrl('index', [
-                    'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
-                ]),
-                'tone' => 'amber',
-            ];
+            $pendingLegalisir = Legalisir::perluTindakLanjut()->count();
+            if ($pendingLegalisir > 0) {
+                $attention[] = [
+                    'label' => 'Legalisir belum selesai diverifikasi',
+                    'count' => $pendingLegalisir,
+                    'detail' => 'status diterima atau sedang diproses',
+                    'url' => LegalisirResource::getUrl('index', [
+                        'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
+                    ]),
+                    'tone' => 'amber',
+                ];
+            }
+
+            $readyLegalisir = Legalisir::where('status', 'siap_diambil')->count();
+            if ($readyLegalisir > 0) {
+                $attention[] = [
+                    'label' => 'Legalisir menunggu diserahkan',
+                    'count' => $readyLegalisir,
+                    'detail' => 'dokumen sudah siap dan belum diambil',
+                    'url' => LegalisirResource::getUrl('index', [
+                        'tableFilters' => ['status' => ['value' => 'siap_diambil']],
+                    ]),
+                    'tone' => 'emerald',
+                ];
+            }
         }
 
         if ($canViewSurat) {
@@ -144,27 +160,73 @@ class WorkspaceOverviewWidget extends Widget
         }
 
         if ($canViewKepegawaian) {
-            $attention[] = [
-                'label' => 'KGB mendekati jatuh tempo',
-                'count' => GajiBerkala::perluTindakLanjut()->count(),
-                'detail' => 'belum diserahkan; satu bulan lalu sampai tiga bulan ke depan',
-                'url' => GajiBerkalaResource::getUrl('index', [
-                    'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
-                ]),
-                'tone' => 'rose',
-            ];
-            $attention[] = [
-                'label' => 'Calon kenaikan pangkat',
-                'count' => Pegawai::active()->calonKp()->count(),
-                'detail' => 'pegawai masuk periode persiapan',
-                'url' => PegawaiResource::getUrl('index', [
-                    'tableFilters' => [
-                        'calon_kp' => ['isActive' => true],
-                        'is_active' => ['value' => true],
-                    ],
-                ]),
-                'tone' => 'emerald',
-            ];
+            $activeKp = KenaikanPangkat::where('status', '!=', 'diserahkan')->count();
+            if ($activeKp > 0) {
+                $attention[] = [
+                    'label' => 'Kenaikan pangkat masih berproses',
+                    'count' => $activeKp,
+                    'detail' => 'berkas belum sampai tahap diserahkan',
+                    'url' => KenaikanPangkatResource::getUrl('index'),
+                    'tone' => 'amber',
+                ];
+            }
+
+            $activeKgb = GajiBerkala::where('status', '!=', 'diserahkan')->count();
+            if ($activeKgb > 0) {
+                $attention[] = [
+                    'label' => 'KGB masih berproses',
+                    'count' => $activeKgb,
+                    'detail' => 'pengajuan belum sampai tahap diserahkan',
+                    'url' => GajiBerkalaResource::getUrl('index', [
+                        'tableFilters' => ['proses_aktif' => ['isActive' => true]],
+                    ]),
+                    'tone' => 'rose',
+                ];
+            }
+        }
+
+        $workflows = [];
+        if ($canViewSurat) {
+            $workflows[] = $this->workflow(
+                'Surat Masuk',
+                'Dari pencatatan sampai arsip',
+                SuratMasukResource::class,
+                SuratMasuk::class,
+                SuratMasuk::STATUSES,
+            );
+            $workflows[] = $this->workflow(
+                'Surat Keluar',
+                'Dari konsep sampai arsip',
+                SuratKeluarResource::class,
+                SuratKeluar::class,
+                SuratKeluar::STATUSES,
+            );
+        }
+        if ($canViewLegalisir) {
+            $workflows[] = $this->workflow(
+                'Legalisir',
+                'Permohonan, verifikasi, kesiapan, dan serah terima',
+                LegalisirResource::class,
+                Legalisir::class,
+                Legalisir::STATUSES,
+                ['ditolak'],
+            );
+        }
+        if ($canViewKepegawaian) {
+            $workflows[] = $this->workflow(
+                'Kenaikan Pangkat',
+                'Berkas disiapkan sampai diserahkan',
+                KenaikanPangkatResource::class,
+                KenaikanPangkat::class,
+                KenaikanPangkat::STATUSES,
+            );
+            $workflows[] = $this->workflow(
+                'Gaji Berkala',
+                'Diproses sampai diserahkan',
+                GajiBerkalaResource::class,
+                GajiBerkala::class,
+                GajiBerkala::STATUSES,
+            );
         }
 
         return [
@@ -173,10 +235,45 @@ class WorkspaceOverviewWidget extends Widget
             'modules' => $modules,
             'utilities' => $utilities,
             'attention' => $attention,
+            'workflows' => $workflows,
             'canViewSurat' => $canViewSurat,
             'canCreateSuratMasuk' => SuratMasukResource::canCreate(),
             'canCreateSuratKeluar' => SuratKeluarResource::canCreate(),
             'roleLabel' => $user?->roleLabel() ?? 'Pengguna',
+        ];
+    }
+
+    /**
+     * @param  class-string  $resource
+     * @param  class-string  $model
+     * @param  array<string, string>  $statuses
+     * @param  array<int, string>  $branches
+     */
+    private function workflow(
+        string $label,
+        string $description,
+        string $resource,
+        string $model,
+        array $statuses,
+        array $branches = [],
+    ): array {
+        $counts = $model::query()
+            ->selectRaw('status, COUNT(*) as total')
+            ->groupBy('status')
+            ->pluck('total', 'status');
+
+        return [
+            'label' => $label,
+            'description' => $description,
+            'url' => $resource::getUrl(),
+            'stages' => collect($statuses)->map(fn (string $stageLabel, string $status): array => [
+                'label' => $stageLabel,
+                'count' => (int) ($counts[$status] ?? 0),
+                'branch' => in_array($status, $branches, true),
+                'url' => $resource::getUrl('index', [
+                    'tableFilters' => ['status' => ['value' => $status]],
+                ]),
+            ])->values()->all(),
         ];
     }
 }

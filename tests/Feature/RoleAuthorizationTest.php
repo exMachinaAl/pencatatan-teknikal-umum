@@ -346,12 +346,13 @@ class RoleAuthorizationTest extends TestCase
         Livewire::test(ListKenaikanPangkats::class)
             ->assertTableColumnExists('mobile_summary')
             ->assertTableColumnExists('pegawai.nama')
-            ->assertTableColumnExists('jenis')
-            ->assertTableColumnExists('golonganLama.kode')
-            ->assertTableColumnExists('golonganBaru.kode')
-            ->assertTableColumnExists('masa_kerja')
+            ->assertTableColumnExists('ringkasan_pengajuan')
             ->assertTableColumnExists('status')
             ->assertTableColumnExists('document_links')
+            ->assertTableColumnDoesNotExist('jenis')
+            ->assertTableColumnDoesNotExist('golonganLama.kode')
+            ->assertTableColumnDoesNotExist('golonganBaru.kode')
+            ->assertTableColumnDoesNotExist('masa_kerja')
             ->assertTableColumnDoesNotExist('periode')
             ->assertTableColumnDoesNotExist('tmt')
             ->assertTableColumnDoesNotExist('nomor_sk');
@@ -416,12 +417,13 @@ class RoleAuthorizationTest extends TestCase
             ->assertTableColumnExists('pegawai.nama')
             ->assertTableColumnExists('golongan.kode')
             ->assertTableColumnExists('masa_kerja')
+            ->assertTableColumnExists('status')
             ->assertTableColumnExists('document_links')
             ->assertTableColumnDoesNotExist('tmt')
             ->assertTableColumnDoesNotExist('tmt_berikutnya')
             ->assertTableColumnDoesNotExist('gaji_pokok_baru')
-            ->assertTableColumnDoesNotExist('status')
             ->assertTableColumnDoesNotExist('nomor_sk')
+            ->assertTableActionExists('lanjutkan_status')
             ->assertTableActionDoesNotExist('tandai_diserahkan');
 
         [$headers] = TuPersonnelExchange::template('kgb');
@@ -502,6 +504,15 @@ class RoleAuthorizationTest extends TestCase
             ->assertTableColumnExists('lokasi_arsip_fisik')
             ->searchTable('LEG-77')
             ->assertCanSeeTableRecords([$legalisir]);
+
+        Livewire::test(ListLegalisirs::class)
+            ->assertTableActionExists('mulai_proses')
+            ->assertTableActionExists('tandai_siap')
+            ->assertTableActionExists('tolak_permohonan')
+            ->assertTableActionExists('tandai_diambil')
+            ->callTableAction('mulai_proses', $legalisir)
+            ->assertHasNoTableActionErrors();
+        $this->assertSame('diproses', $legalisir->refresh()->status);
 
         $this->assertContains('lokasi_arsip_fisik', TuDataExchange::template('legalisir')[0]);
         $this->assertSame(1, TuDataExchange::query('legalisir', 'LEG-77', null, null)->count());
@@ -770,7 +781,12 @@ class RoleAuthorizationTest extends TestCase
                 'Surat Keluar',
                 'Legalisir',
             ])
-            ->assertViewHas('attention', fn (array $items): bool => count($items) === 1)
+            ->assertViewHas('attention', fn (array $items): bool => count($items) === 0)
+            ->assertViewHas('workflows', fn (array $items): bool => array_column($items, 'label') === [
+                'Surat Masuk',
+                'Surat Keluar',
+                'Legalisir',
+            ])
             ->assertViewHas('canViewSurat', true)
             ->assertViewHas('canCreateSuratMasuk', false)
             ->assertViewHas('canCreateSuratKeluar', false)

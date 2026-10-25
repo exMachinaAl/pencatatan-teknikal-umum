@@ -99,6 +99,44 @@
         </section>
         @endif
 
+        @if (count($workflows))
+        <section class="tu-workflows" aria-labelledby="workflow-title">
+            <div class="tu-section-heading">
+                <div>
+                    <p class="tu-eyebrow">Proses bisnis</p>
+                    <h2 id="workflow-title">Posisi pekerjaan saat ini</h2>
+                </div>
+                <span>Klik tahap untuk memfilter daftar</span>
+            </div>
+
+            <div class="tu-workflow-list">
+                @foreach ($workflows as $workflow)
+                    <article class="tu-workflow-card">
+                        <div class="tu-workflow-heading">
+                            <div>
+                                <h3>{{ $workflow['label'] }}</h3>
+                                <p>{{ $workflow['description'] }}</p>
+                            </div>
+                            <a href="{{ $workflow['url'] }}" class="tu-text-link">
+                                Buka menu
+                                <x-filament::icon icon="heroicon-m-arrow-up-right" />
+                            </a>
+                        </div>
+
+                        <div class="tu-workflow-stages">
+                            @foreach ($workflow['stages'] as $stage)
+                                <a href="{{ $stage['url'] }}" class="tu-workflow-stage{{ $stage['branch'] ? ' tu-workflow-stage--branch' : '' }}">
+                                    <strong>{{ $stage['count'] }}</strong>
+                                    <span>{{ $stage['label'] }}</span>
+                                </a>
+                            @endforeach
+                        </div>
+                    </article>
+                @endforeach
+            </div>
+        </section>
+        @endif
+
         @if (count($modules))
         <section class="tu-quick-nav" aria-labelledby="quick-nav-title">
             <div class="tu-section-heading">

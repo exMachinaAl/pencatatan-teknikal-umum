@@ -19,6 +19,12 @@ class EditSuratMasuk extends EditRecord
         return $this->updateWithOptimisticLock($record, $data);
     }
 
+    protected function afterSave(): void
+    {
+        $this->record->refresh();
+        $this->loadedLockVersion = (int) $this->record->lock_version;
+    }
+
     protected function getHeaderActions(): array
     {
         return [

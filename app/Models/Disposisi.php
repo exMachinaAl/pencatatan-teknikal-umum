@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 
 class Disposisi extends Model
 {
@@ -35,6 +37,32 @@ class Disposisi extends Model
         'diproses' => 'Sedang Diproses',
         'selesai' => 'Selesai',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Disposisi $disposisi): void {
+            $disposisi->dari_user_id ??= Auth::id();
+        });
+
+        static::saving(function (Disposisi $disposisi): void {
+            $disposisi->status ??= 'terbuka';
+            $disposisi->prioritas ??= 'normal';
+
+            if (! array_key_exists((string) $disposisi->status, self::STATUSES)) {
+                throw ValidationException::withMessages(['status' => 'Status disposisi tidak valid.']);
+            }
+
+            if (! in_array($disposisi->prioritas, ['normal', 'penting', 'mendesak'], true)) {
+                throw ValidationException::withMessages(['prioritas' => 'Prioritas disposisi tidak valid.']);
+            }
+
+            if ($disposisi->status === 'selesai') {
+                $disposisi->selesai_pada ??= now();
+            } else {
+                $disposisi->selesai_pada = null;
+            }
+        });
+    }
 
     public function suratMasuk(): BelongsTo
     {

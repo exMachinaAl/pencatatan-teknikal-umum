@@ -9,6 +9,7 @@ use App\Models\Pegawai;
 use App\Models\RefGolongan;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
+use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
@@ -375,6 +376,13 @@ class DataIntegrityTest extends TestCase
             Legalisir::count(),
         ]);
         $this->assertSame('197508152005011002', Pegawai::where('nama', 'Ahmad Fauzi, S.Pd., M.Si')->value('nip'));
+        $this->assertSame(2, User::where('role', User::ROLE_PETUGAS_TU)->count());
+        $this->assertSame(2, User::where('role', User::ROLE_KEPEGAWAIAN)->count());
+        $this->assertNotNull(User::where('username', 'pegawai')->value('pegawai_id'));
+        $this->assertSame(0, KenaikanPangkat::whereNotNull('periode')->count());
+        $this->assertSame(0, KenaikanPangkat::whereNotNull('nomor_sk')->count());
+        $this->assertSame(0, GajiBerkala::whereNotNull('gaji_pokok_lama')->count());
+        $this->assertSame(0, Legalisir::where('biaya', '!=', 0)->count());
     }
 
     private function golonganPair(): array

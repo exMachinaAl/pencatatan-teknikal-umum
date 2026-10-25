@@ -14,6 +14,8 @@ class UserSeeder extends Seeder
             'kepala_tu' => 'TU_KEPALA_TU_INITIAL_PASSWORD',
             'kepala_sekolah' => 'TU_KEPALA_SEKOLAH_INITIAL_PASSWORD',
             'staf_tu' => 'TU_PETUGAS_TU_INITIAL_PASSWORD',
+            'kepegawaian' => 'TU_KEPEGAWAIAN_INITIAL_PASSWORD',
+            'auditor' => 'TU_AUDITOR_INITIAL_PASSWORD',
             'pegawai' => 'TU_PEGAWAI_INITIAL_PASSWORD',
         };
         $password = trim((string) config("security.initial_passwords.{$username}"));
@@ -77,6 +79,28 @@ class UserSeeder extends Seeder
                 'is_active' => true,
             ],
             [
+                'name' => 'Dewi Lestari, S.AP (Petugas Kepegawaian)',
+                'username' => 'kepegawaian',
+                'email' => 'kepegawaian@tu.sekolah.sch.id',
+                'nomor_telepon' => '081200000006',
+                'jabatan' => 'Pengelola Administrasi Kepegawaian',
+                'unit_kerja' => 'Tata Usaha',
+                'password' => $this->initialPassword('kepegawaian'),
+                'role' => User::ROLE_KEPEGAWAIAN,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Pengawas Internal Sekolah',
+                'username' => 'auditor',
+                'email' => 'auditor@tu.sekolah.sch.id',
+                'nomor_telepon' => '081200000007',
+                'jabatan' => 'Pengawas / Auditor Internal',
+                'unit_kerja' => 'Pengawasan',
+                'password' => $this->initialPassword('auditor'),
+                'role' => User::ROLE_AUDITOR,
+                'is_active' => true,
+            ],
+            [
                 'name' => 'Budi Santoso, S.Pd (Pegawai / Guru)',
                 'username' => 'pegawai',
                 'email' => 'pegawai@tu.sekolah.sch.id',
@@ -97,7 +121,10 @@ class UserSeeder extends Seeder
         }
 
         foreach ($users as $data) {
-            $existing = User::withTrashed()->where('email', $data['email'])->first();
+            $existing = User::withTrashed()
+                ->where('username', $data['username'])
+                ->orWhere('email', $data['email'])
+                ->first();
             if ($existing) {
                 foreach (['username', 'nomor_telepon', 'jabatan', 'unit_kerja'] as $field) {
                     if (blank($existing->{$field}) && filled($data[$field] ?? null)) {

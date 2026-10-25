@@ -77,6 +77,15 @@ class SuratMasuk extends Model
                 throw ValidationException::withMessages(['status' => 'Status surat masuk tidak valid.']);
             }
 
+            if ($surat->exists
+                && $surat->isDirty('status')
+                && $surat->status === 'diarsipkan'
+                && $surat->disposisi()->where('status', '!=', 'selesai')->exists()) {
+                throw ValidationException::withMessages([
+                    'status' => 'Surat belum dapat diarsipkan karena disposisi masih berjalan.',
+                ]);
+            }
+
             if ($surat->tanggal_surat && $surat->tanggal_diterima && Carbon::parse($surat->tanggal_surat)->gt(Carbon::parse($surat->tanggal_diterima))) {
                 throw ValidationException::withMessages(['tanggal_surat' => 'Tanggal surat tidak boleh setelah tanggal diterima.']);
             }

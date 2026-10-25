@@ -126,11 +126,12 @@ class KenaikanPangkatResource extends Resource
                             collect([$record->golonganLama?->kode, $record->golonganBaru?->kode])->filter()->implode(' → '),
                             "Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln",
                             KenaikanPangkat::STATUSES[$record->status] ?? $record->status,
+                            static::effectiveRankDescription($record),
                         ])->filter()->implode(' · '),
                         'externalAttribute' => 'tautan_lampiran',
                     ])
                     ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
-                    ->hiddenFrom('md'),
+                    ->hiddenFrom('lg'),
 
                 Tables\Columns\TextColumn::make('pegawai.nama')
                     ->label('Nama Pegawai')
@@ -138,34 +139,20 @@ class KenaikanPangkatResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->description(fn (KenaikanPangkat $record) => $record->pegawai?->nip ?: '-')
-                    ->visibleFrom('md'),
+                    ->extraCellAttributes(['class' => 'tu-table-primary'])
+                    ->visibleFrom('lg'),
 
-                Tables\Columns\BadgeColumn::make('jenis')
-                    ->label('Jenis KP')
-                    ->colors([
-                        'primary' => 'reguler',
-                        'success' => 'pilihan',
-                        'warning' => 'penyesuaian_ijazah',
-                    ])
-                    ->formatStateUsing(fn ($state) => KenaikanPangkat::jenisLabel($state))
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('golonganLama.kode')
-                    ->label('Gol Lama')
-                    ->badge()
-                    ->color('gray')
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('golonganBaru.kode')
-                    ->label('Gol Baru')
-                    ->badge()
-                    ->color('success')
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('masa_kerja')
-                    ->label('Masa Kerja')
-                    ->state(fn (KenaikanPangkat $record): string => "{$record->mk_tahun} Thn {$record->mk_bulan} Bln")
-                    ->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('ringkasan_pengajuan')
+                    ->label('Pengajuan Pangkat')
+                    ->state(fn (KenaikanPangkat $record): string => collect([
+                        $record->golonganLama?->kode,
+                        $record->golonganBaru?->kode,
+                    ])->filter()->implode(' → ') ?: '-')
+                    ->description(fn (KenaikanPangkat $record): string => KenaikanPangkat::jenisLabel($record->jenis)
+                        ." · Masa kerja {$record->mk_tahun} thn {$record->mk_bulan} bln")
+                    ->wrap()
+                    ->extraCellAttributes(['class' => 'tu-table-secondary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status Alur')
@@ -176,14 +163,16 @@ class KenaikanPangkatResource extends Resource
                         'primary' => 'diserahkan',
                     ])
                     ->formatStateUsing(fn ($state) => KenaikanPangkat::STATUSES[$state] ?? $state)
+                    ->description(fn (KenaikanPangkat $record): ?string => static::effectiveRankDescription($record))
                     ->sortable()
-                    ->visibleFrom('md'),
+                    ->extraCellAttributes(['class' => 'tu-table-status'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\ViewColumn::make('document_links')
                     ->label('Lampiran')
                     ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
-                    ->visibleFrom('md'),
+                    ->visibleFrom('lg'),
 
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
@@ -206,22 +195,30 @@ class KenaikanPangkatResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     Tables\Actions\ViewAction::make(),
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\Action::make('update_status')
-                        ->label('Ubah Status')
-                        ->icon('heroicon-o-arrow-path')
+                    Tables\Actions\Action::make('lanjutkan_status')
+                        ->label(fn (KenaikanPangkat $record): string => 'Lanjut ke '.(KenaikanPangkat::STATUSES[$record->nextStatus()] ?? 'Tahap Berikutnya'))
+                        ->icon('heroicon-o-forward')
+                        ->requiresConfirmation()
                         ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (KenaikanPangkat $record): bool => $record->status !== 'diserahkan')
-                        ->form([
-                            Forms\Components\Select::make('status')
-                                ->label('Status Baru')
-                                ->options(KenaikanPangkat::STATUSES)
-                                ->required(),
-                        ])
+                        ->visible(fn (KenaikanPangkat $record): bool => $record->nextStatus() !== null)
+                        ->form(fn (KenaikanPangkat $record): array => $record->nextStatus() === 'sk_terbit'
+                            ? [
+                                Forms\Components\DatePicker::make('tmt')
+                                    ->label('TMT Pangkat Baru')
+                                    ->helperText('Golongan pegawai akan berubah otomatis saat tanggal efektif ini tercapai.')
+                                    ->required()
+                                    ->displayFormat('d/m/Y'),
+                            ]
+                            : [])
                         ->action(function (KenaikanPangkat $record, array $data) {
                             static::authorizeResourceAction('transition');
                             ConcurrentRecordUpdate::run($record, function (KenaikanPangkat $locked) use ($data): void {
                                 Pegawai::whereKey($locked->pegawai_id)->lockForUpdate()->firstOrFail();
-                                $locked->update(array_filter($data, fn ($value) => $value !== null && $value !== ''));
+                                $nextStatus = $locked->nextStatus();
+                                $locked->update([
+                                    'status' => $nextStatus,
+                                    ...($nextStatus === 'sk_terbit' ? ['tmt' => $data['tmt']] : []),
+                                ]);
                             });
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
@@ -273,6 +270,24 @@ class KenaikanPangkatResource extends Resource
         return [
             //
         ];
+    }
+
+    private static function effectiveRankDescription(KenaikanPangkat $record): ?string
+    {
+        if (! $record->tmt) {
+            return null;
+        }
+
+        $date = $record->tmt->translatedFormat('d M Y');
+        if ($record->tmt->isFuture()) {
+            return "TMT {$date} · Belum berlaku";
+        }
+
+        if ((int) $record->pegawai?->golongan_id === (int) $record->golongan_baru_id) {
+            return "TMT {$date} · Sudah diterapkan";
+        }
+
+        return "TMT {$date} · Menunggu sinkronisasi";
     }
 
     public static function getPages(): array

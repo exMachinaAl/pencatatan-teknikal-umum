@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class KenaikanPangkat extends Model
@@ -49,6 +50,13 @@ class KenaikanPangkat extends Model
         'diserahkan' => 'Diserahkan',
     ];
 
+    private const STATUS_TRANSITIONS = [
+        'berkas_disiapkan' => 'diajukan',
+        'diajukan' => 'sk_terbit',
+        'sk_terbit' => 'diserahkan',
+        'diserahkan' => null,
+    ];
+
     public const JENIS_KP = [
         'reguler' => 'Reguler (4 Tahunan)',
         'pilihan' => 'Pilihan (Jabatan Fungsional)',
@@ -77,6 +85,15 @@ class KenaikanPangkat extends Model
 
             if (! $jenisValid) {
                 throw ValidationException::withMessages(['jenis' => 'Jenis kenaikan pangkat tidak valid.']);
+            }
+
+            if ($model->exists && $model->isDirty('status')) {
+                $expected = self::STATUS_TRANSITIONS[(string) $model->getOriginal('status')] ?? null;
+                if ($model->status !== $expected) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Status kenaikan pangkat harus dilanjutkan satu tahap sesuai urutan proses.',
+                    ]);
+                }
             }
 
             if (! array_key_exists((string) $model->status, self::STATUSES)) {
@@ -137,27 +154,55 @@ class KenaikanPangkat extends Model
         });
 
         static::saved(function (KenaikanPangkat $model): void {
-            if (! in_array($model->status, ['sk_terbit', 'diserahkan'], true) || ! $model->golongan_baru_id || ! $model->tmt) {
-                return;
-            }
-
-            $date = Carbon::parse($model->tmt)->toDateString();
-            $pegawai = Pegawai::query()
-                ->whereKey($model->pegawai_id)
-                ->where(function ($query) use ($date): void {
-                    $query->whereNull('tmt_pangkat_terakhir')
-                        ->orWhereDate('tmt_pangkat_terakhir', '<=', $date);
-                })
-                ->lockForUpdate()
-                ->first();
-
-            if ($pegawai) {
-                $pegawai->update([
-                    'golongan_id' => $model->golongan_baru_id,
-                    'tmt_pangkat_terakhir' => $date,
-                ]);
-            }
+            $model->applyEffectiveRank();
         });
+    }
+
+    /**
+     * Terapkan golongan resmi hanya setelah SK terbit dan TMT sudah berlaku.
+     * Aman dipanggil berulang oleh scheduler karena pembaruan bersifat idempoten.
+     */
+    public function applyEffectiveRank(): bool
+    {
+        if (! in_array($this->status, ['sk_terbit', 'diserahkan'], true)
+            || ! $this->golongan_baru_id
+            || ! $this->tmt
+            || Carbon::parse($this->tmt)->isFuture()) {
+            return false;
+        }
+
+        return DB::transaction(function (): bool {
+            $promotion = static::query()->whereKey($this->getKey())->lockForUpdate()->first();
+            if (! $promotion
+                || ! in_array($promotion->status, ['sk_terbit', 'diserahkan'], true)
+                || ! $promotion->golongan_baru_id
+                || ! $promotion->tmt
+                || Carbon::parse($promotion->tmt)->isFuture()) {
+                return false;
+            }
+
+            $date = Carbon::parse($promotion->tmt)->toDateString();
+            $pegawai = Pegawai::query()->whereKey($promotion->pegawai_id)->lockForUpdate()->first();
+            if (! $pegawai) {
+                return false;
+            }
+
+            if ($pegawai->tmt_pangkat_terakhir && Carbon::parse($pegawai->tmt_pangkat_terakhir)->gt($date)) {
+                return false;
+            }
+
+            if ((int) $pegawai->golongan_id === (int) $promotion->golongan_baru_id
+                && $pegawai->tmt_pangkat_terakhir?->toDateString() === $date) {
+                return false;
+            }
+
+            $pegawai->update([
+                'golongan_id' => $promotion->golongan_baru_id,
+                'tmt_pangkat_terakhir' => $date,
+            ]);
+
+            return true;
+        }, 3);
     }
 
     public static function integrityKey(
@@ -179,6 +224,11 @@ class KenaikanPangkat extends Model
         return self::JENIS_KP[$jenis]
             ?? self::JENIS_KP_LEGACY[$jenis]
             ?? (string) $jenis;
+    }
+
+    public function nextStatus(): ?string
+    {
+        return self::STATUS_TRANSITIONS[$this->status] ?? null;
     }
 
     public function pegawai(): BelongsTo

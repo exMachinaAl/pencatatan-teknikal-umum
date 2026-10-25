@@ -112,8 +112,8 @@ class LegalisirResource extends Resource
                             ->label('Status Alur Legalisir')
                             ->options(Legalisir::STATUSES)
                             ->default('diterima')
-                            ->disabled(fn (string $operation): bool => $operation === 'create')
-                            ->dehydrated()
+                            ->disabled()
+                            ->dehydrated(false)
                             ->helperText('Gunakan aksi pada tabel untuk perubahan status operasional agar identitas pemeriksa tercatat.')
                             ->required()
                             ->reactive(),
@@ -202,7 +202,7 @@ class LegalisirResource extends Resource
                         'externalAttribute' => 'tautan_lampiran',
                     ])
                     ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
-                    ->hiddenFrom('md'),
+                    ->hiddenFrom('lg'),
 
                 Tables\Columns\TextColumn::make('nomor_antrean')
                     ->label('No. Antrean')
@@ -210,39 +210,32 @@ class LegalisirResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->description(fn (Legalisir $record) => $record->nomor_legalisir)
-                    ->visibleFrom('md'),
+                    ->extraCellAttributes(['class' => 'tu-table-primary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\TextColumn::make('nama_pemohon')
                     ->label('Nama Pemohon')
                     ->searchable()
                     ->sortable()
                     ->weight('semibold')
-                    ->description(fn (Legalisir $record) => $record->kontak ?: '-')
-                    ->visibleFrom('md'),
-
-                Tables\Columns\BadgeColumn::make('status_pemohon')
-                    ->label('Pemohon')
-                    ->colors([
-                        'primary' => 'alumni',
-                        'success' => 'siswa',
-                        'warning' => 'wali',
-                        'gray' => 'lainnya',
-                    ])
-                    ->formatStateUsing(fn ($state) => Legalisir::STATUS_PEMOHON[$state] ?? $state)
-                    ->visibleFrom('md'),
+                    ->description(fn (Legalisir $record): string => collect([
+                        Legalisir::STATUS_PEMOHON[$record->status_pemohon] ?? $record->status_pemohon,
+                        $record->kontak,
+                    ])->filter()->implode(' · ') ?: '-')
+                    ->wrap()
+                    ->extraCellAttributes(['class' => 'tu-table-primary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\TextColumn::make('jenis_dokumen')
                     ->label('Dokumen')
                     ->badge()
                     ->color('info')
-                    ->description(fn (Legalisir $record) => "{$record->jumlah_lembar} Lembar")
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('tanggal_permohonan')
-                    ->label('Tgl Permohonan')
-                    ->date('d M Y')
-                    ->sortable()
-                    ->visibleFrom('md'),
+                    ->description(fn (Legalisir $record): string => collect([
+                        "{$record->jumlah_lembar} lembar",
+                        $record->tanggal_permohonan?->translatedFormat('d M Y'),
+                    ])->filter()->implode(' · '))
+                    ->extraCellAttributes(['class' => 'tu-table-secondary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Status')
@@ -255,20 +248,23 @@ class LegalisirResource extends Resource
                     ])
                     ->formatStateUsing(fn ($state) => Legalisir::STATUSES[$state] ?? $state)
                     ->sortable()
-                    ->visibleFrom('md'),
+                    ->extraCellAttributes(['class' => 'tu-table-status'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\ViewColumn::make('document_links')
                     ->label('Lampiran')
                     ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
-                    ->visibleFrom('md'),
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
                     ->label('Lokasi Arsip')
                     ->searchable()
                     ->placeholder('-')
                     ->limit(28)
-                    ->visibleFrom('md'),
+                    ->wrap()
+                    ->extraCellAttributes(['class' => 'tu-table-archive'])
+                    ->visibleFrom('lg'),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
             ->filters([
@@ -312,12 +308,27 @@ class LegalisirResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('print'))
                         ->url(fn (Legalisir $record) => route('legalisir.cetak-bukti', $record->id))
                         ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('mulai_proses')
+                        ->label('Mulai Verifikasi')
+                        ->icon('heroicon-o-play')
+                        ->color('info')
+                        ->requiresConfirmation()
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (Legalisir $record): bool => $record->status === 'diterima')
+                        ->action(function (Legalisir $record): void {
+                            static::authorizeResourceAction('transition');
+                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
+                                'status' => 'diproses',
+                                'petugas_id' => Auth::id(),
+                            ]));
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('tandai_siap')
                         ->label('Tandai Siap Diambil')
                         ->icon('heroicon-o-check')
                         ->color('warning')
                         ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (Legalisir $record): bool => in_array($record->status, ['diterima', 'diproses'], true))
+                        ->visible(fn (Legalisir $record): bool => $record->status === 'diproses')
                         ->form([
                             Forms\Components\Checkbox::make('dokumen_asli_dilihat')->label('Dokumen asli telah dilihat')->accepted()->required(),
                             Forms\Components\Checkbox::make('identitas_cocok')->label('Identitas pemohon cocok')->accepted()->required(),
@@ -332,6 +343,27 @@ class LegalisirResource extends Resource
                                 'diverifikasi_oleh' => Auth::id(),
                                 'diverifikasi_pada' => now(),
                                 ...$data,
+                            ]));
+                        })
+                        ->after(fn ($livewire) => $livewire->resetTable()),
+                    Tables\Actions\Action::make('tolak_permohonan')
+                        ->label('Tolak Permohonan')
+                        ->icon('heroicon-o-x-circle')
+                        ->color('danger')
+                        ->authorize(fn (): bool => static::resourcePermission('transition'))
+                        ->visible(fn (Legalisir $record): bool => in_array($record->status, ['diterima', 'diproses'], true))
+                        ->form([
+                            Forms\Components\Textarea::make('alasan_penolakan')
+                                ->label('Alasan Penolakan')
+                                ->required()
+                                ->maxLength(20000),
+                        ])
+                        ->action(function (Legalisir $record, array $data): void {
+                            static::authorizeResourceAction('transition');
+                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
+                                'status' => 'ditolak',
+                                'alasan_penolakan' => $data['alasan_penolakan'],
+                                'petugas_id' => Auth::id(),
                             ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),

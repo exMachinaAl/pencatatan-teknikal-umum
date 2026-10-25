@@ -87,6 +87,14 @@ class Legalisir extends Model
         'ditolak' => 'Ditolak / Berkas Tidak Sesuai',
     ];
 
+    private const STATUS_TRANSITIONS = [
+        'diterima' => ['diproses', 'ditolak'],
+        'diproses' => ['siap_diambil', 'ditolak'],
+        'siap_diambil' => ['diambil'],
+        'diambil' => [],
+        'ditolak' => [],
+    ];
+
     public const JENIS_DOKUMEN = [
         'Ijazah' => 'Ijazah SMA',
         'SKHUN' => 'SKHUN',
@@ -122,6 +130,14 @@ class Legalisir extends Model
             if (! array_key_exists((string) $legalisir->status, self::STATUSES)) {
                 throw ValidationException::withMessages(['status' => 'Status legalisir tidak valid.']);
             }
+            if ($legalisir->exists && $legalisir->isDirty('status')) {
+                $allowed = self::STATUS_TRANSITIONS[(string) $legalisir->getOriginal('status')] ?? [];
+                if (! in_array($legalisir->status, $allowed, true)) {
+                    throw ValidationException::withMessages([
+                        'status' => 'Perubahan status legalisir tidak sesuai urutan proses.',
+                    ]);
+                }
+            }
             if (! array_key_exists((string) $legalisir->status_pemohon, self::STATUS_PEMOHON)) {
                 throw ValidationException::withMessages(['status_pemohon' => 'Status pemohon tidak valid.']);
             }
@@ -144,6 +160,9 @@ class Legalisir extends Model
 
             if ($legalisir->status === 'diambil' && (! $legalisir->tanggal_diambil || blank($legalisir->pengambil))) {
                 throw ValidationException::withMessages(['status' => 'Tanggal dan nama pengambil wajib diisi sebelum dokumen ditandai sudah diambil.']);
+            }
+            if ($legalisir->status === 'ditolak' && blank($legalisir->alasan_penolakan)) {
+                throw ValidationException::withMessages(['alasan_penolakan' => 'Alasan penolakan wajib diisi.']);
             }
             if ($legalisir->lokasi_arsip_fisik !== null
                 && (mb_strlen($legalisir->lokasi_arsip_fisik, 'UTF-8') > 150

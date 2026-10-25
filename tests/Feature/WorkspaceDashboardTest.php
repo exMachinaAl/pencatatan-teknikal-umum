@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Filament\Pages\BackupManager;
 use App\Filament\Resources\GajiBerkalaResource\Pages\ListGajiBerkalas;
 use App\Filament\Resources\LegalisirResource\Pages\ListLegalisirs;
-use App\Filament\Resources\PegawaiResource\Pages\ListPegawais;
 use App\Filament\Resources\UserResource;
 use App\Filament\Widgets\WorkspaceOverviewWidget;
 use App\Models\GajiBerkala;
@@ -77,10 +76,9 @@ class WorkspaceDashboardTest extends TestCase
         $completed = $this->legalisir('diambil');
 
         $pegawai = Pegawai::create(['nama' => 'Calon aktif', 'tmt_pangkat_terakhir' => '2022-04-15', 'is_active' => true]);
-        $inactive = Pegawai::create(['nama' => 'Calon nonaktif', 'tmt_pangkat_terakhir' => '2022-04-15', 'is_active' => false]);
-        $future = Pegawai::create(['nama' => 'Belum masuk periode', 'tmt_pangkat_terakhir' => '2026-01-01']);
+        Pegawai::create(['nama' => 'Calon nonaktif', 'tmt_pangkat_terakhir' => '2022-04-15', 'is_active' => false]);
+        Pegawai::create(['nama' => 'Belum masuk periode', 'tmt_pangkat_terakhir' => '2026-01-01']);
 
-        // Kedua batas tanggal termasuk, terlepas dari jam saat query dijalankan.
         $kgb = collect(['2026-09-15', '2027-01-15'])->values()->map(fn ($date, $index) => GajiBerkala::create([
             'pegawai_id' => $pegawai->id, 'tmt' => '2024-0'.($index + 1).'-01',
             'tmt_berikutnya' => $date, 'status' => 'diproses',
@@ -98,11 +96,19 @@ class WorkspaceDashboardTest extends TestCase
         Livewire::test(WorkspaceOverviewWidget::class)
             ->assertViewHas('attention', function ($items) use (&$attention) {
                 $attention = $items;
-                return array_column($items, 'count') === [2, 2, 1];
+
+                return array_column($items, 'count') === [2, 3];
+            })
+            ->assertViewHas('workflows', function (array $workflows): bool {
+                $byLabel = collect($workflows)->keyBy('label');
+
+                return array_column($byLabel['Legalisir']['stages'], 'count') === [1, 1, 0, 1, 0]
+                    && array_column($byLabel['Gaji Berkala']['stages'], 'count') === [3, 0, 1];
             });
 
         $params = function (int $index) use ($attention): array {
             parse_str(parse_url($attention[$index]['url'], PHP_URL_QUERY), $query);
+
             return $query;
         };
 
@@ -111,12 +117,28 @@ class WorkspaceDashboardTest extends TestCase
             ->assertCanNotSeeTableRecords([$completed]);
 
         Livewire::withQueryParams($params(1))->test(ListGajiBerkalas::class)
-            ->assertCanSeeTableRecords($kgb)
-            ->assertCanNotSeeTableRecords([$delivered, $outside]);
+            ->assertCanSeeTableRecords($kgb->push($outside))
+            ->assertCanNotSeeTableRecords([$delivered]);
+    }
 
-        Livewire::withQueryParams($params(2))->test(ListPegawais::class)
-            ->assertCanSeeTableRecords([$pegawai])
-            ->assertCanNotSeeTableRecords([$inactive, $future]);
+    public function test_status_kgb_dilanjutkan_berurutan_dari_tabel(): void
+    {
+        $pegawai = Pegawai::create(['nama' => 'Pemohon KGB']);
+        $kgb = GajiBerkala::create([
+            'pegawai_id' => $pegawai->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 0,
+        ]);
+
+        Livewire::test(ListGajiBerkalas::class)
+            ->callTableAction('lanjutkan_status', $kgb)
+            ->assertHasNoTableActionErrors();
+        $this->assertSame('sk_terbit', $kgb->refresh()->status);
+
+        Livewire::test(ListGajiBerkalas::class)
+            ->callTableAction('lanjutkan_status', $kgb)
+            ->assertHasNoTableActionErrors();
+        $this->assertSame('diserahkan', $kgb->refresh()->status);
     }
 
     public function test_utilitas_admin_tidak_ditawarkan_ke_staf(): void

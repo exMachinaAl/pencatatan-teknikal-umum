@@ -8,6 +8,8 @@ return [
         'kepala_tu' => env('TU_KEPALA_TU_INITIAL_PASSWORD'),
         'kepala_sekolah' => env('TU_KEPALA_SEKOLAH_INITIAL_PASSWORD'),
         'staf_tu' => env('TU_PETUGAS_TU_INITIAL_PASSWORD'),
+        'kepegawaian' => env('TU_KEPEGAWAIAN_INITIAL_PASSWORD'),
+        'auditor' => env('TU_AUDITOR_INITIAL_PASSWORD'),
         'pegawai' => env('TU_PEGAWAI_INITIAL_PASSWORD'),
     ],
 ];
