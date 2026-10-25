@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use App\Support\DocumentSequence;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class SuratMasuk extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'surat_masuk';
 

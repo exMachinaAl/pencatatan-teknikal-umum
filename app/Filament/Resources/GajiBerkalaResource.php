@@ -4,9 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\GajiBerkalaResource\Pages;
+use App\Models\AuditLog;
 use App\Models\GajiBerkala;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -167,6 +169,7 @@ class GajiBerkalaResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'GajiBerkala', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="gaji-berkala-'.date('Ymd-His').'.csv"',
@@ -174,9 +177,9 @@ class GajiBerkalaResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Golongan', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Tautan Lampiran']);
+                                SecureCsv::writeRow($handle, ['NIP', 'Nama Pegawai', 'Golongan', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Tautan Lampiran']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->pegawai?->nip,
                                         $row->pegawai?->nama,
                                         $row->golongan?->kode,

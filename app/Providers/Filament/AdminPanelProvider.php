@@ -27,6 +27,7 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(Login::class)
+            ->databaseTransactions()
             ->brandName('Sistem Informasi Tata Usaha')
             // Navigasi penuh lebih tahan terhadap kegagalan query daripada SPA:
             // respons error tidak dapat meninggalkan shell panel dalam keadaan kosong.

@@ -15,6 +15,7 @@ class AuditObserver
             $attributes['remember_token'],
             $attributes['tracking_token_hash'],
             $attributes['tracking_token_encrypted'],
+            $attributes['lock_version'],
         );
 
         return $attributes;

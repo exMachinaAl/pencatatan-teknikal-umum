@@ -5,10 +5,10 @@
             <div>
                 <h3 class="text-xl font-bold flex items-center gap-2">
                     <x-filament::icon icon="heroicon-o-shield-check" class="w-6 h-6" />
-                    Pencadangan Database Privat & Terjadwal
+                    Pencadangan Privat & Terjadwal
                 </h3>
                 <p class="text-emerald-100 text-sm mt-1 max-w-2xl">
-                    Cadangkan data kepegawaian, surat dinas, arsip, dan riwayat legalisir sekolah dengan sekali klik. Berkas SQL disimpan di folder privat server; enkripsi backup akan diselesaikan pada fase V4.5.
+                    Bundle ZIP mencakup database dan lampiran lokal. Pada production, bundle wajib dienkripsi melalui konfigurasi server dan disimpan juga di media terpisah.
                 </p>
             </div>
             <x-filament::button color="white" wire:click="createBackup" icon="heroicon-o-plus-circle" class="shadow-lg text-emerald-800 hover:bg-emerald-50">
@@ -20,7 +20,7 @@
         <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
             <h4 class="text-base font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center gap-2">
                 <x-filament::icon icon="heroicon-o-folder-arrow-down" class="w-5 h-5 text-emerald-600" />
-                Arsip Berkas Cadangan (SQL Snapshots)
+                Arsip Bundle Cadangan (ZIP)
             </h4>
 
             <div class="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg">
@@ -73,14 +73,14 @@
                 Panduan Prosedur Pemulihan (Database Restore)
             </h4>
             <p class="text-xs text-gray-600 dark:text-gray-400 leading-relaxed">
-                Jika sewaktu-waktu terjadi kerusakan server atau kehilangan data, Anda dapat memulihkan seluruh basis data menggunakan terminal/command prompt:
+                Pemulihan harus dilakukan administrator pada server terisolasi. Ekstrak bundle, pulihkan <code>database.sql</code>, lalu salin isi direktori <code>files/</code> ke penyimpanan privat aplikasi.
             </p>
             <div class="bg-gray-900 text-emerald-400 p-3 rounded-lg font-mono text-xs overflow-x-auto select-all">
-                # Menjalankan pemulihan database via MySQL CLI:<br>
-                mysql -u root tata_usaha_db &lt; storage/app/backups/nama_berkas_backup.sql
+                # Setelah bundle diekstrak dan diverifikasi:<br>
+                mysql -u pengguna_database -p nama_database &lt; database.sql
             </div>
             <p class="text-xs text-gray-500">
-                Pencadangan otomatis juga dapat dijadwalkan secara harian via Task Scheduler Windows atau Cron Linux dengan perintah: <code>php artisan app:backup-database</code>.
+                Aplikasi menjadwalkan backup pukul 01.30. Pastikan Task Scheduler Windows atau Cron menjalankan <code>php artisan schedule:run</code> setiap menit, lalu uji pemulihan secara berkala.
             </p>
         </div>
     </div>

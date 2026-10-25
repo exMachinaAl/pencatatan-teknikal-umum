@@ -4,7 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\LegalisirResource\Pages;
+use App\Models\AuditLog;
 use App\Models\Legalisir;
+use App\Support\ConcurrentRecordUpdate;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -101,6 +104,7 @@ class LegalisirResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Status Pemrosesan & Pengambilan')
+                    ->description('Bagian sensitif: status siap/diambil divalidasi di server, dicatat per akun, dan memerlukan checklist lengkap.')
                     ->collapsible()
                     ->collapsed()
                     ->schema([
@@ -108,6 +112,9 @@ class LegalisirResource extends Resource
                             ->label('Status Alur Legalisir')
                             ->options(Legalisir::STATUSES)
                             ->default('diterima')
+                            ->disabled(fn (string $operation): bool => $operation === 'create')
+                            ->dehydrated()
+                            ->helperText('Gunakan aksi pada tabel untuk perubahan status operasional agar identitas pemeriksa tercatat.')
                             ->required()
                             ->reactive(),
 
@@ -319,13 +326,13 @@ class LegalisirResource extends Resource
                         ])
                         ->action(function (Legalisir $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update([
+                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
                                 'status' => 'siap_diambil',
                                 'tanggal_selesai' => now(),
                                 'diverifikasi_oleh' => Auth::id(),
                                 'diverifikasi_pada' => now(),
                                 ...$data,
-                            ]);
+                            ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('tandai_diambil')
@@ -350,13 +357,13 @@ class LegalisirResource extends Resource
                         ])
                         ->action(function (Legalisir $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update([
+                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
                                 'status' => 'diambil',
                                 'pengambil' => $data['pengambil'],
                                 'hubungan_pengambil' => $data['hubungan_pengambil'],
                                 'bukti_serah_terima_path' => $data['bukti_serah_terima_path'] ?? null,
                                 'tanggal_diambil' => now(),
-                            ]);
+                            ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
@@ -371,6 +378,7 @@ class LegalisirResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'Legalisir', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="legalisir-'.date('Ymd-His').'.csv"',
@@ -378,9 +386,9 @@ class LegalisirResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['No Registrasi', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Jumlah Lembar', 'Lokasi Arsip', 'Tgl Permohonan', 'Tgl Selesai', 'Tgl Diambil', 'Pengambil', 'Status']);
+                                SecureCsv::writeRow($handle, ['No Registrasi', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Jumlah Lembar', 'Lokasi Arsip', 'Tgl Permohonan', 'Tgl Selesai', 'Tgl Diambil', 'Pengambil', 'Status']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->nomor_legalisir,
                                         $row->nama_pemohon,
                                         $row->kontak,

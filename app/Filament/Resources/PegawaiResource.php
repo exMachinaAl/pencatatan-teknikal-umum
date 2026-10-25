@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\PegawaiResource\Pages;
+use App\Models\AuditLog;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -172,6 +174,7 @@ class PegawaiResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'Pegawai', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="data-pegawai-'.date('Ymd-His').'.csv"',
@@ -179,9 +182,9 @@ class PegawaiResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama Lengkap & Gelar', 'Status Kepegawaian', 'Golongan / Ruang']);
+                                SecureCsv::writeRow($handle, ['NIP', 'Nama Lengkap & Gelar', 'Status Kepegawaian', 'Golongan / Ruang']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->nip,
                                         $row->nama,
                                         $row->status_kepegawaian,

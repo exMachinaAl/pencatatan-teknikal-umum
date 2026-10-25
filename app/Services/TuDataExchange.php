@@ -6,6 +6,7 @@ use App\Models\Legalisir;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
+use App\Support\SecureCsv;
 use DateTimeImmutable;
 use DOMDocument;
 use DOMXPath;
@@ -508,11 +509,7 @@ final class TuDataExchange
             $stream = fopen('php://output', 'wb');
             fwrite($stream, "\xEF\xBB\xBF");
             foreach ($rows as $row) {
-                fputcsv($stream, array_map(static function ($v) {
-                    $v = (string) $v;
-
-                    return preg_match('/^[\s\x00-\x1F]*[=+@\-]/u', $v) ? "'".$v : $v;
-                }, $row), ',', '"', '');
+                SecureCsv::writeRow($stream, $row);
             }
             fclose($stream);
         }, $filename, ['Content-Type' => 'text/csv; charset=UTF-8']);

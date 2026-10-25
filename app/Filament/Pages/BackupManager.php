@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\AuditLog;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Artisan;
@@ -31,14 +32,17 @@ class BackupManager extends Page
         abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
 
         try {
-            Artisan::call('app:backup-database');
+            $exitCode = Artisan::call('app:backup-database');
+            if ($exitCode !== 0) {
+                throw new \RuntimeException(trim(Artisan::output()) ?: 'Perintah backup gagal.');
+            }
             Notification::make()
                 ->title('Pencadangan database berhasil dibuat.')
                 ->success()
                 ->send();
         } catch (\Throwable $e) {
             Notification::make()
-                ->title('Gagal membuat pencadangan: ' . $e->getMessage())
+                ->title('Gagal membuat pencadangan: '.$e->getMessage())
                 ->danger()
                 ->send();
         }
@@ -49,6 +53,10 @@ class BackupManager extends Page
         abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
 
         $filePath = $this->resolveBackupPath($filename);
+        AuditLog::record('backup_unduh', 'database_backup', null, null, [
+            'file' => $filename,
+            'size' => filesize($filePath),
+        ]);
 
         return response()->download($filePath);
     }
@@ -58,6 +66,7 @@ class BackupManager extends Page
         abort_unless(auth()->user()?->canPerform('backup', 'manage'), 403);
 
         $filePath = $this->resolveBackupPath($filename);
+        AuditLog::record('backup_hapus', 'database_backup', null, ['file' => $filename, 'size' => filesize($filePath)], null);
         unlink($filePath);
         Notification::make()->title('Berkas backup telah dihapus.')->success()->send();
     }
@@ -68,12 +77,12 @@ class BackupManager extends Page
             $filename !== basename($filename) ||
             str_contains($filename, '/') ||
             str_contains($filename, '\\') ||
-            ! preg_match('/\Abackup-[A-Za-z0-9._-]+\.sql\z/D', $filename)
+            ! preg_match('/\Abackup-[A-Za-z0-9._-]+\.zip\z/D', $filename)
         ) {
             abort(404);
         }
 
-        $backupRoot = realpath(storage_path('app/backups'));
+        $backupRoot = realpath(storage_path('secure-backups'));
         $filePath = $backupRoot ? realpath($backupRoot.DIRECTORY_SEPARATOR.$filename) : false;
 
         if (! $backupRoot || ! $filePath || ! is_file($filePath) || dirname($filePath) !== $backupRoot) {
@@ -85,18 +94,18 @@ class BackupManager extends Page
 
     public function getBackupFilesProperty(): array
     {
-        $backupDir = storage_path('app/backups');
+        $backupDir = storage_path('secure-backups');
         if (! file_exists($backupDir)) {
             return [];
         }
 
-        $files = glob("{$backupDir}/*.sql");
+        $files = glob("{$backupDir}/*.zip");
         $results = [];
 
         foreach ($files as $file) {
             $results[] = [
                 'name' => basename($file),
-                'size' => round(filesize($file) / 1024, 2) . ' KB',
+                'size' => round(filesize($file) / 1024, 2).' KB',
                 'created_at' => date('d M Y H:i:s', filemtime($file)),
             ];
         }

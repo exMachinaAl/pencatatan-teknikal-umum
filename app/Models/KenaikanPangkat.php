@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,7 @@ use Illuminate\Validation\ValidationException;
 
 class KenaikanPangkat extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'kenaikan_pangkat';
 
@@ -141,16 +142,21 @@ class KenaikanPangkat extends Model
             }
 
             $date = Carbon::parse($model->tmt)->toDateString();
-            Pegawai::query()
+            $pegawai = Pegawai::query()
                 ->whereKey($model->pegawai_id)
                 ->where(function ($query) use ($date): void {
                     $query->whereNull('tmt_pangkat_terakhir')
                         ->orWhereDate('tmt_pangkat_terakhir', '<=', $date);
                 })
-                ->update([
+                ->lockForUpdate()
+                ->first();
+
+            if ($pegawai) {
+                $pegawai->update([
                     'golongan_id' => $model->golongan_baru_id,
                     'tmt_pangkat_terakhir' => $date,
                 ]);
+            }
         });
     }
 

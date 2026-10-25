@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Panel;
@@ -15,7 +16,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable implements FilamentUser, HasAvatar
 {
-    use HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use HasApiTokens, HasFactory, HasOptimisticLock, Notifiable, SoftDeletes;
 
     public const ROLE_ADMIN = 'admin';
 
@@ -120,6 +121,12 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
                     ]);
                 }
 
+                if (preg_match('/^\d+$/D', $user->username)) {
+                    throw ValidationException::withMessages([
+                        'username' => 'Username tidak boleh seluruhnya berupa angka agar tidak bertabrakan dengan NIP.',
+                    ]);
+                }
+
                 $usernameDipakai = static::withTrashed()
                     ->where('username', $user->username)
                     ->when($user->exists, fn ($query) => $query->whereKeyNot($user->getKey()))
@@ -127,6 +134,17 @@ class User extends Authenticatable implements FilamentUser, HasAvatar
 
                 if ($usernameDipakai) {
                     throw ValidationException::withMessages(['username' => 'Username sudah digunakan.']);
+                }
+
+                $nipDipakai = Pegawai::withTrashed()
+                    ->where('nip', $user->username)
+                    ->when($user->pegawai_id, fn ($query) => $query->whereKeyNot($user->pegawai_id))
+                    ->exists();
+
+                if ($nipDipakai) {
+                    throw ValidationException::withMessages([
+                        'username' => 'Username bertabrakan dengan NIP pegawai lain.',
+                    ]);
                 }
             }
 

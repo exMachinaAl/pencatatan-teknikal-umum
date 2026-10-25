@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class SuratKeluar extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'surat_keluar';
 

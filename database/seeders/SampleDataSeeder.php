@@ -294,6 +294,11 @@ class SampleDataSeeder extends Seeder
             'biaya' => 0,
             'status' => 'siap_diambil',
             'petugas_id' => $admin?->id,
+            'dokumen_asli_dilihat' => true,
+            'identitas_cocok' => true,
+            'data_sekolah_cocok' => true,
+            'diverifikasi_oleh' => $admin?->id,
+            'diverifikasi_pada' => Carbon::now(),
             'catatan' => 'Lulusan tahun 2023, buku induk sudah dicocokkan.',
         ]);
 

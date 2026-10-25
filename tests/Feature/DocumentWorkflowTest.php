@@ -52,9 +52,13 @@ class DocumentWorkflowTest extends TestCase
 
     public function test_status_siap_diambil_membuat_outbox_email_dan_whatsapp_satu_kali(): void
     {
+        $this->actingAs($this->user());
         $legalisir = $this->legalisir([
             'email_pemohon' => 'pemohon@example.test',
             'kanal_notifikasi' => 'keduanya',
+            'dokumen_asli_dilihat' => true,
+            'identitas_cocok' => true,
+            'data_sekolah_cocok' => true,
         ]);
 
         $legalisir->update(['status' => 'siap_diambil']);
@@ -68,9 +72,13 @@ class DocumentWorkflowTest extends TestCase
 
     public function test_status_siap_diambil_tidak_mengantrekan_tujuan_email_yang_mengandung_header_baru(): void
     {
+        $this->actingAs($this->user());
         $legalisir = $this->legalisir([
             'email_pemohon' => "pemohon@example.test\r\nBcc:penyerang@example.test",
             'kanal_notifikasi' => 'email',
+            'dokumen_asli_dilihat' => true,
+            'identitas_cocok' => true,
+            'data_sekolah_cocok' => true,
         ]);
 
         $legalisir->update(['status' => 'siap_diambil']);

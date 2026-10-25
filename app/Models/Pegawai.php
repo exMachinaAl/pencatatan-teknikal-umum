@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class Pegawai extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'pegawai';
 
@@ -86,6 +87,17 @@ class Pegawai extends Model
 
                 if ($duplicate) {
                     throw ValidationException::withMessages(['nip' => 'NIP sudah digunakan, termasuk pada data yang dihapus sementara.']);
+                }
+
+                $usernameBentrok = User::withTrashed()
+                    ->where('username', mb_strtolower($pegawai->nip))
+                    ->when($pegawai->exists, fn ($query) => $query->where(function ($account) use ($pegawai): void {
+                        $account->whereNull('pegawai_id')->orWhere('pegawai_id', '!=', $pegawai->getKey());
+                    }))
+                    ->exists();
+
+                if ($usernameBentrok) {
+                    throw ValidationException::withMessages(['nip' => 'NIP bertabrakan dengan username akun lain. Ubah username akun tersebut terlebih dahulu.']);
                 }
             }
 

@@ -4,8 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\SuratKeluarResource\Pages;
+use App\Models\AuditLog;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratKeluar;
+use App\Support\ConcurrentRecordUpdate;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -65,7 +68,7 @@ class SuratKeluarResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Klasifikasi & Arsip Digital')
-                    ->description('Isi kode klasifikasi dan lampiran arsip dalam satu bagian. Kode baru dapat ditambahkan langsung bila belum tersedia.')
+                    ->description('Bagian sensitif: lampiran disimpan privat, terikat pada record ini, dan setiap akses unduh/pratinjau dicatat.')
                     ->schema([
                         Forms\Components\Select::make('klasifikasi_id')
                             ->label('Kode Klasifikasi Surat')
@@ -263,13 +266,13 @@ class SuratKeluarResource extends Resource
                         ])
                         ->action(function (SuratKeluar $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update([
+                            ConcurrentRecordUpdate::run($record, fn (SuratKeluar $locked) => $locked->update([
                                 'status' => 'terkirim',
                                 'metode_pengiriman' => $data['metode_pengiriman'] ?? 'lainnya',
                                 'nomor_resi' => $data['nomor_resi'] ?? null,
                                 'dikirim_pada' => $data['dikirim_pada'] ?? now(),
                                 'bukti_pengiriman_path' => $data['bukti_pengiriman_path'] ?? null,
-                            ]);
+                            ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('arsipkan')
@@ -286,11 +289,11 @@ class SuratKeluarResource extends Resource
                         ])
                         ->action(function (SuratKeluar $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update([
+                            ConcurrentRecordUpdate::run($record, fn (SuratKeluar $locked) => $locked->update([
                                 'status' => 'diarsipkan',
                                 'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
                                 'diarsipkan_pada' => now(),
-                            ]);
+                            ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\Action::make('catat_diterima')
@@ -309,7 +312,7 @@ class SuratKeluarResource extends Resource
                         ])
                         ->action(function (SuratKeluar $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update($data);
+                            ConcurrentRecordUpdate::run($record, fn (SuratKeluar $locked) => $locked->update($data));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
@@ -324,6 +327,7 @@ class SuratKeluarResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'SuratKeluar', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="surat-keluar-'.date('Ymd-His').'.csv"',
@@ -331,9 +335,9 @@ class SuratKeluarResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['Nomor Surat', 'Tanggal', 'Tujuan', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
+                                SecureCsv::writeRow($handle, ['Nomor Surat', 'Tanggal', 'Tujuan', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->nomor_surat,
                                         $row->tanggal_surat?->format('Y-m-d'),
                                         $row->tujuan,

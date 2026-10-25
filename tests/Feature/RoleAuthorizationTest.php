@@ -718,6 +718,9 @@ class RoleAuthorizationTest extends TestCase
             'nomor_legalisir' => 'LEG/2026/0888', 'nama_pemohon' => 'Alumni',
             'status_pemohon' => 'alumni', 'jenis_dokumen' => 'Ijazah',
             'tanggal_permohonan' => now(), 'status' => 'diambil',
+            'dokumen_asli_dilihat' => true, 'identitas_cocok' => true,
+            'data_sekolah_cocok' => true, 'tanggal_diambil' => now(),
+            'pengambil' => 'Alumni',
         ]);
 
         $this->assertFalse(SuratMasukResource::canEdit($suratMasuk));

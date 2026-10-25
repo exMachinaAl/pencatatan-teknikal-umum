@@ -4,9 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\SuratMasukResource\Pages;
+use App\Models\AuditLog;
 use App\Models\Disposisi;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratMasuk;
+use App\Support\ConcurrentRecordUpdate;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -74,7 +77,7 @@ class SuratMasukResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Klasifikasi & Arsip Digital')
-                    ->description('Isi kode klasifikasi dan lampiran arsip dalam satu bagian. Kode baru dapat ditambahkan langsung bila belum tersedia.')
+                    ->description('Bagian sensitif: lampiran disimpan privat, terikat pada record ini, dan setiap akses unduh/pratinjau dicatat.')
                     ->schema([
                         Forms\Components\Select::make('klasifikasi_id')
                             ->label('Kode Klasifikasi Surat')
@@ -295,11 +298,11 @@ class SuratMasukResource extends Resource
                         ])
                         ->action(function (SuratMasuk $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            $record->update([
+                            ConcurrentRecordUpdate::run($record, fn (SuratMasuk $locked) => $locked->update([
                                 'status' => 'diarsipkan',
                                 'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
                                 'diarsipkan_pada' => now(),
-                            ]);
+                            ]));
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
@@ -314,6 +317,7 @@ class SuratMasukResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'SuratMasuk', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="surat-masuk-'.date('Ymd-His').'.csv"',
@@ -321,9 +325,9 @@ class SuratMasukResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
+                                SecureCsv::writeRow($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->nomor_agenda,
                                         $row->nomor_surat,
                                         $row->tanggal_surat?->format('Y-m-d'),

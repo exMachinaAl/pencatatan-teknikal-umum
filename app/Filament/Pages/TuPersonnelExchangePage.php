@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\AuditLog;
 use App\Services\TuDataExchange;
 use App\Services\TuPersonnelExchange;
 use Filament\Forms;
@@ -94,7 +95,7 @@ class TuPersonnelExchangePage extends Page implements HasForms
                     Forms\Components\DatePicker::make('end')->label('Tanggal sampai'),
                 ])->columns(3),
             Forms\Components\Section::make('Unggah file impor')
-                ->description('Maksimal 5 MB dan 1.000 baris. Gunakan NIP untuk mencocokkan pegawai KP/KGB secara aman.')
+                ->description('Bagian sensitif: periksa pratinjau sebelum konfirmasi. Impor dicatat per akun dan dijalankan dalam satu transaksi.')
                 ->schema([
                     Forms\Components\FileUpload::make('file')->label('CSV / XLSX')->disk('local')
                         ->directory(fn () => 'tu-exchange/personnel-temp/'.Auth::id())->visibility('private')
@@ -127,6 +128,7 @@ class TuPersonnelExchangePage extends Page implements HasForms
             $this->ensurePermission($module, false);
             $rows = TuPersonnelExchange::export($module, $state['search'] ?? null, $state['start'] ?? null, $state['end'] ?? null);
             $name = 'ekspor-kepegawaian-'.$module.'-'.date('Ymd-His').'.'.$state['format'];
+            AuditLog::record('export', $module, null, null, ['file' => $name, 'jumlah_baris' => max(0, count($rows) - 1)]);
 
             return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows, $name) : TuDataExchange::csvDownload($rows, $name);
         } catch (Throwable $e) {
@@ -197,6 +199,7 @@ class TuPersonnelExchangePage extends Page implements HasForms
                 throw new RuntimeException('Isi file berubah; lakukan pratinjau ulang.');
             }
             $this->result = TuPersonnelExchange::import($this->previewModule, $file, (int) Auth::id());
+            AuditLog::record('import', $this->previewModule, null, null, $this->result);
             Storage::disk('local')->delete($this->previewPath);
             $this->reset(['preview', 'previewPath', 'previewModule', 'previewHash', 'previewProof']);
             Notification::make()->title('Berhasil menambah '.$this->result['success'].' data.')->success()->send();

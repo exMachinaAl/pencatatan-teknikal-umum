@@ -4,16 +4,18 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\KenaikanPangkatResource\Pages;
+use App\Models\AuditLog;
 use App\Models\KenaikanPangkat;
 use App\Models\Pegawai;
 use App\Models\RefGolongan;
+use App\Support\ConcurrentRecordUpdate;
+use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Response;
 
 class KenaikanPangkatResource extends Resource
@@ -217,9 +219,9 @@ class KenaikanPangkatResource extends Resource
                         ])
                         ->action(function (KenaikanPangkat $record, array $data) {
                             static::authorizeResourceAction('transition');
-                            DB::transaction(function () use ($record, $data): void {
-                                Pegawai::whereKey($record->pegawai_id)->lockForUpdate()->firstOrFail();
-                                $record->update(array_filter($data, fn ($value) => $value !== null && $value !== ''));
+                            ConcurrentRecordUpdate::run($record, function (KenaikanPangkat $locked) use ($data): void {
+                                Pegawai::whereKey($locked->pegawai_id)->lockForUpdate()->firstOrFail();
+                                $locked->update(array_filter($data, fn ($value) => $value !== null && $value !== ''));
                             });
                         })
                         ->after(fn ($livewire) => $livewire->resetTable()),
@@ -235,6 +237,7 @@ class KenaikanPangkatResource extends Resource
                         ->authorize(fn (): bool => static::resourcePermission('export'))
                         ->action(function ($records) {
                             static::authorizeResourceAction('export');
+                            AuditLog::record('export', 'KenaikanPangkat', null, null, ['jumlah_record' => $records->count()]);
                             $headers = [
                                 'Content-Type' => 'text/csv',
                                 'Content-Disposition' => 'attachment; filename="kenaikan-pangkat-'.date('Ymd-His').'.csv"',
@@ -242,9 +245,9 @@ class KenaikanPangkatResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                fputcsv($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Tautan Lampiran', 'Status']);
+                                SecureCsv::writeRow($handle, ['NIP', 'Nama Pegawai', 'Jenis KP', 'Gol Lama', 'Gol Baru', 'Masa Kerja Tahun', 'Masa Kerja Bulan', 'Tautan Lampiran', 'Status']);
                                 foreach ($records as $row) {
-                                    fputcsv($handle, [
+                                    SecureCsv::writeRow($handle, [
                                         $row->pegawai?->nip,
                                         $row->pegawai?->nama,
                                         $row->jenis,

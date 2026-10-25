@@ -12,7 +12,7 @@ class UserSeederTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_seeder_mereset_password_tetapi_tidak_menimpa_role_atau_status_akun_yang_sudah_ada(): void
+    public function test_seeder_melengkapi_identitas_tanpa_menimpa_password_role_atau_status_akun_lama(): void
     {
         $existing = User::create([
             'name' => 'Admin Existing',
@@ -25,7 +25,7 @@ class UserSeederTest extends TestCase
         $this->seed(UserSeeder::class);
 
         $existing->refresh();
-        $this->assertTrue(Hash::check('password', $existing->password));
+        $this->assertTrue(Hash::check('rahasia-yang-sudah-diganti', $existing->password));
         $this->assertSame(User::ROLE_AUDITOR, $existing->role);
         $this->assertFalse($existing->is_active);
         $this->assertSame('admin', $existing->username);
@@ -36,7 +36,7 @@ class UserSeederTest extends TestCase
         ]);
     }
 
-    public function test_menjalankan_seeder_ulang_mereset_password(): void
+    public function test_menjalankan_seeder_ulang_mempertahankan_password_yang_sudah_diganti(): void
     {
         $this->seed(UserSeeder::class);
 
@@ -45,11 +45,11 @@ class UserSeederTest extends TestCase
 
         $this->seed(UserSeeder::class);
 
-        $this->assertTrue(Hash::check('password', $kepala->refresh()->password));
+        $this->assertTrue(Hash::check('password-baru-yang-aman', $kepala->refresh()->password));
         $this->assertDatabaseCount('users', 5);
     }
 
-    public function test_seluruh_akun_bawaan_memakai_password_yang_sama(): void
+    public function test_akun_bawaan_lokal_memakai_fallback_password_pengembangan(): void
     {
         $this->seed(UserSeeder::class);
 

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Models\AuditLog;
 use App\Models\User;
 use App\Services\TuDataExchange;
 use Filament\Forms;
@@ -137,7 +138,7 @@ class TuDataExchangePage extends Page implements HasForms
                     Forms\Components\DatePicker::make('end')->label('Sampai tanggal'),
                 ])->columns(3),
             Forms\Components\Section::make('Unggah untuk impor')
-                ->description('Format kolom harus mengikuti template. Maksimal 5 MB / 1.000 baris. Diperlukan izin impor pada modul yang dipilih.')
+                ->description('Bagian sensitif: periksa pratinjau sebelum konfirmasi. Impor dicatat per akun dan dijalankan dalam satu transaksi.')
                 ->schema([
                     Forms\Components\FileUpload::make('file')->label('Berkas CSV atau XLSX')->disk('local')
                         ->directory(fn (): string => 'tu-exchange/temp/'.Auth::id())->visibility('private')
@@ -170,6 +171,7 @@ class TuDataExchangePage extends Page implements HasForms
             $this->authorizeModule($module, 'export');
             $rows = TuDataExchange::exportRows($module, $state['search'] ?? null, $state['start'] ?? null, $state['end'] ?? null);
             $filename = 'ekspor-tu-'.$module.'-'.date('Ymd-His').'.'.$state['format'];
+            AuditLog::record('export', $module, null, null, ['file' => $filename, 'jumlah_baris' => max(0, count($rows) - 1)]);
 
             return $state['format'] === 'xlsx' ? TuDataExchange::xlsxDownload($rows, $filename) : TuDataExchange::csvDownload($rows, $filename);
         } catch (Throwable $e) {
@@ -241,6 +243,7 @@ class TuDataExchangePage extends Page implements HasForms
                 throw new RuntimeException('Masih ada baris tidak valid. Perbaiki file lalu pratinjau ulang.');
             }
             $this->result = TuDataExchange::import((string) $this->previewModule, $path, (int) Auth::id());
+            AuditLog::record('import', (string) $this->previewModule, null, null, $this->result);
             // Hapus hanya file unggahan milik sesi ini; tidak menghapus arsip/surat di storage lainnya.
             Storage::disk('local')->delete($this->previewPath);
             $this->reset(['preview', 'previewPath', 'previewModule', 'previewHash', 'previewProof']);

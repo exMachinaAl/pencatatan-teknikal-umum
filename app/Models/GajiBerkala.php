@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Validation\ValidationException;
 
 class GajiBerkala extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'gaji_berkala';
 
@@ -138,13 +139,18 @@ class GajiBerkala extends Model
             }
 
             $date = Carbon::parse($model->tmt)->toDateString();
-            Pegawai::query()
+            $pegawai = Pegawai::query()
                 ->whereKey($model->pegawai_id)
                 ->where(function ($query) use ($date): void {
                     $query->whereNull('tmt_kgb_terakhir')
                         ->orWhereDate('tmt_kgb_terakhir', '<=', $date);
                 })
-                ->update(['tmt_kgb_terakhir' => $date]);
+                ->lockForUpdate()
+                ->first();
+
+            if ($pegawai) {
+                $pegawai->update(['tmt_kgb_terakhir' => $date]);
+            }
         });
     }
 

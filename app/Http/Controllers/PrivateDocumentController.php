@@ -5,8 +5,12 @@ namespace App\Http\Controllers;
 use App\Models\AuditLog;
 use App\Models\Lampiran;
 use App\Models\LampiranAccessLog;
+use App\Models\Legalisir;
 use App\Models\Pegawai;
+use App\Models\SuratKeluar;
+use App\Models\SuratMasuk;
 use App\Models\User;
+use App\Support\SecureDocumentPath;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -68,6 +72,20 @@ class PrivateDocumentController extends Controller
         };
 
         abort_unless($module && auth()->user()?->canPerform($module, 'view'), 403);
+
+        $entity = class_basename((string) $lampiran->entitas);
+        $owner = match ($entity) {
+            'SuratMasuk' => SuratMasuk::withTrashed()->find($lampiran->entitas_id),
+            'SuratKeluar' => SuratKeluar::withTrashed()->find($lampiran->entitas_id),
+            'Legalisir' => Legalisir::withTrashed()->find($lampiran->entitas_id),
+            default => null,
+        };
+
+        if (in_array($entity, ['SuratMasuk', 'SuratKeluar', 'Legalisir'], true)) {
+            $field = SecureDocumentPath::fieldForAttachment($lampiran);
+            abort_unless($owner && $field, 404);
+            SecureDocumentPath::validate($owner, $field, $lampiran->path);
+        }
     }
 
     private function recordAccess(Lampiran $lampiran, string $action): void

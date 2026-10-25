@@ -150,10 +150,18 @@ class WorkspaceDashboardTest extends TestCase
 
     private function legalisir(string $status): Legalisir
     {
-        return Legalisir::create([
+        $completed = $status === 'diambil' ? [
+            'dokumen_asli_dilihat' => true,
+            'identitas_cocok' => true,
+            'data_sekolah_cocok' => true,
+            'tanggal_diambil' => '2026-10-15',
+            'pengambil' => 'Pemohon '.$status,
+        ] : [];
+
+        return Legalisir::create(array_merge([
             'nomor_legalisir' => "LEG/{$status}", 'nama_pemohon' => "Pemohon {$status}",
             'jenis_dokumen' => 'Ijazah', 'status_pemohon' => 'alumni',
             'tanggal_permohonan' => '2026-10-15', 'status' => $status,
-        ]);
+        ], $completed));
     }
 }

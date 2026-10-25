@@ -61,12 +61,14 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 * Panduan penggunaan tersedia di [docs/PANDUAN-SPREADSHEET-DAN-LAMPIRAN.md](docs/PANDUAN-SPREADSHEET-DAN-LAMPIRAN.md).
 
 ### 8. Audit Log & Keamanan
-* Pencatatan otomatis riwayat aksi `create`, `update`, `delete`, `restore`, dan `import` menggunakan Model Observers.
-* Merekam identitas pengguna, IP address, waktu, serta perbandingan data sebelum dan sesudah perubahan (kata sandi dikecualikan dari log).
+* Pencatatan otomatis riwayat perubahan, login, impor/ekspor, akses lampiran, serta pengelolaan backup.
+* Merekam ID akun, snapshot username/role, IP address, waktu, serta perbandingan data sebelum dan sesudah perubahan. Kata sandi dan token dikecualikan.
+* Formulir edit memakai versi record; penyimpanan ditolak jika pengguna lain sudah mengubah data sejak formulir dibuka.
 
 ### 9. Pencadangan & Pemulihan Database (Backup & Restore)
 * Perintah terjadwal via CLI: `php artisan app:backup-database`.
-* Menu antarmuka visual (1-Click Backup) di Panel Admin untuk membuat dan mengunduh dump SQL dari penyimpanan privat. Enkripsi dan verifikasi checksum dijadwalkan pada fase V4.5.
+* Menu Panel Admin membuat bundle ZIP privat berisi `database.sql` dan lampiran lokal, dengan retensi 30 backup terbaru.
+* Pada production, `BACKUP_ARCHIVE_PASSWORD` wajib diisi minimal 16 karakter. Scheduler aplikasi menjalankan backup pukul 01.30; server tetap harus menjalankan `php artisan schedule:run` setiap menit.
 
 ---
 
@@ -74,7 +76,7 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 
 Seeder membuat lima akun lokal berikut. Administrator Sistem berada di Divisi IT sebagai fasilitator teknis dan bukan atasan operasional TU. Kepala TU adalah pimpinan tertinggi di lingkungan TU. Dua role tambahan (`kepegawaian` dan `auditor`) dapat diberikan Administrator Sistem kepada pengguna nyata melalui menu Kelola Pengguna.
 
-> Seluruh akun bawaan menggunakan password `password`. Menjalankan `UserSeeder` ulang akan mereset password kelima akun bawaan menjadi `password`, tanpa mengubah role atau status aktifnya.
+> Pada lingkungan lokal, akun baru memakai fallback `password`. Pada production, setiap variabel password awal di `.env` wajib diisi dan sebaiknya berbeda. Menjalankan `UserSeeder` ulang tidak mengubah password, role, atau status akun yang sudah ada.
 
 | Peran (Role) | Username | Email Lama | Kata Sandi | Hak Akses Utama |
 |---|---|---|---|---|
@@ -141,10 +143,10 @@ Jumlah test terus bertambah mengikuti fase pengembangan. Gunakan hasil perintah 
 
 ## 🛡️ Prosedur Pemulihan Basis Data (Restore Guide)
 
-Jika ingin memulihkan database dari snapshot cadangan yang ada di folder `storage/app/backups/`:
+Unduh bundle dari menu Pencadangan, ekstrak dengan password backup, lalu pulihkan pada server terisolasi. Isi `files/` dikembalikan ke penyimpanan privat dan database dipulihkan dari `database.sql`:
 
 ```powershell
-mysql -u root -p tata_usaha_db < storage/app/backups/backup-tata_usaha_db-YYYY-MM-DD_HH-mm-ss.sql
+mysql -u pengguna_database -p nama_database < database.sql
 ```
 
 ---

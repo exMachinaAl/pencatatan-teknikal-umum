@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use App\Support\DocumentSequence;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,12 +11,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class Legalisir extends Model
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, HasOptimisticLock, SoftDeletes;
 
     protected $table = 'legalisir';
 
@@ -125,6 +127,23 @@ class Legalisir extends Model
             }
             if (! array_key_exists((string) $legalisir->kanal_notifikasi, self::KANAL_NOTIFIKASI)) {
                 throw ValidationException::withMessages(['kanal_notifikasi' => 'Kanal notifikasi tidak valid.']);
+            }
+            if (in_array($legalisir->status, ['siap_diambil', 'diambil'], true)) {
+                if (! $legalisir->checklistLengkap()) {
+                    throw ValidationException::withMessages(['status' => 'Dokumen hanya dapat dinyatakan siap setelah seluruh checklist verifikasi terpenuhi.']);
+                }
+
+                $legalisir->diverifikasi_oleh ??= Auth::id();
+                $legalisir->diverifikasi_pada ??= now();
+                $legalisir->tanggal_selesai ??= now()->toDateString();
+
+                if (! $legalisir->diverifikasi_oleh) {
+                    throw ValidationException::withMessages(['status' => 'Identitas petugas verifikasi tidak tersedia. Silakan masuk kembali.']);
+                }
+            }
+
+            if ($legalisir->status === 'diambil' && (! $legalisir->tanggal_diambil || blank($legalisir->pengambil))) {
+                throw ValidationException::withMessages(['status' => 'Tanggal dan nama pengambil wajib diisi sebelum dokumen ditandai sudah diambil.']);
             }
             if ($legalisir->lokasi_arsip_fisik !== null
                 && (mb_strlen($legalisir->lokasi_arsip_fisik, 'UTF-8') > 150

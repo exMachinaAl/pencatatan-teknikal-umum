@@ -81,7 +81,7 @@ class UserResource extends Resource
                     ])->columns(2),
 
                 Forms\Components\Section::make('Peran dan status')
-                    ->description('Akses modul ditentukan oleh peran. Pengguna tidak dapat mengubah perannya sendiri.')
+                    ->description('Bagian sensitif: akses ditentukan oleh peran dan perubahan akun dicatat. Pengguna tidak dapat mengubah perannya sendiri.')
                     ->schema([
                         Forms\Components\Select::make('role')
                             ->label('Peran')
@@ -107,13 +107,13 @@ class UserResource extends Resource
                             ->label('Kata sandi baru')
                             ->password()
                             ->revealable()
-                            ->minLength(8)
+                            ->minLength(12)
                             ->dehydrateStateUsing(fn ($state) => filled($state) ? Hash::make($state) : null)
                             ->dehydrated(fn ($state) => filled($state))
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->helperText(fn (string $operation): string => $operation === 'edit'
                                 ? 'Biarkan kosong jika kata sandi tidak diubah.'
-                                : 'Minimal 8 karakter.'),
+                                : 'Minimal 12 karakter dan gunakan password berbeda untuk setiap akun.'),
                     ]),
             ]);
     }

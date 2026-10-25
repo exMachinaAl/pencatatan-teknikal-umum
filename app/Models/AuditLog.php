@@ -19,6 +19,8 @@ class AuditLog extends Model
     protected $fillable = [
         'user_id',
         'user_name',
+        'user_username',
+        'user_role',
         'aksi',
         'entitas',
         'entitas_id',
@@ -47,6 +49,8 @@ class AuditLog extends Model
         return static::create([
             'user_id' => $user?->id,
             'user_name' => $user?->name ?? 'Sistem / Anonim',
+            'user_username' => $user?->username,
+            'user_role' => $user?->normalizedRole(),
             'aksi' => $aksi,
             'entitas' => $entitas,
             'entitas_id' => $entitasId,

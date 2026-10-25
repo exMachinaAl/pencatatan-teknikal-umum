@@ -104,6 +104,10 @@ class AuditLogResource extends Resource
                 Tables\Columns\TextColumn::make('user_name')
                     ->label('Pengguna')
                     ->searchable()
+                    ->description(fn (AuditLog $record): string => collect([
+                        $record->user_username ? '@'.$record->user_username : null,
+                        $record->user_role,
+                    ])->filter()->implode(' · '))
                     ->weight('bold')
                     ->visibleFrom('md'),
 

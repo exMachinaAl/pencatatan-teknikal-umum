@@ -7,12 +7,20 @@ use App\Models\Lampiran;
 use App\Models\Legalisir;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
+use App\Support\SecureDocumentPath;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class DocumentFileObserver
 {
+    public function saving(Model $model): void
+    {
+        foreach ($this->fileFields($model) as $field => $label) {
+            SecureDocumentPath::validate($model, $field, $model->getAttribute($field));
+        }
+    }
+
     public function created(Model $model): void
     {
         foreach ($this->fileFields($model) as $field => $label) {

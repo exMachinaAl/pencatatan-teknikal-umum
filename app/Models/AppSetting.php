@@ -2,12 +2,13 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasOptimisticLock;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class AppSetting extends Model
 {
-    use HasFactory;
+    use HasFactory, HasOptimisticLock;
 
     protected $table = 'app_settings';
 
