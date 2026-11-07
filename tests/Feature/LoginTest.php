@@ -135,6 +135,6 @@ class LoginTest extends TestCase
             ->assertSee('Ruang Kerja Tata Usaha')
             ->assertSee('Administrator Sistem (Fasilitator TI)')
             ->assertSee('Pengaturan dan utilitas')
-            ->assertSee('Surat yang perlu dilihat');
+            ->assertSee('Catatan surat terbaru');
     }
 }
