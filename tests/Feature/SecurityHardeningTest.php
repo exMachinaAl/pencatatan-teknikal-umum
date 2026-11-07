@@ -82,7 +82,11 @@ class SecurityHardeningTest extends TestCase
     public function test_perubahan_dibatalkan_jika_audit_log_gagal_disimpan(): void
     {
         $this->actingAs($this->operator('operator.audit'));
-        $record = SuratMasuk::create(['tanggal_diterima' => today(), 'pengirim' => 'Sebelum']);
+        $record = SuratMasuk::create([
+            'tanggal_diterima' => today(),
+            'pengirim' => 'Sebelum',
+            'lokasi_arsip_fisik' => 'Lemari Audit',
+        ]);
         $component = Livewire::test(EditSuratMasuk::class, ['record' => $record->id])
             ->fillForm(['pengirim' => 'Sesudah']);
 

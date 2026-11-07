@@ -36,6 +36,9 @@ class Legalisir extends Model
         'lokasi_arsip_fisik',
         'tahun_lulus',
         'jumlah_lembar',
+        'jumlah_dibawa',
+        'jumlah_dikembalikan',
+        'jumlah_disimpan',
         'dokumen_asli_dilihat',
         'identitas_cocok',
         'data_sekolah_cocok',
@@ -65,6 +68,9 @@ class Legalisir extends Model
         'diverifikasi_pada' => 'datetime',
         'biaya' => 'decimal:2',
         'jumlah_lembar' => 'integer',
+        'jumlah_dibawa' => 'integer',
+        'jumlah_dikembalikan' => 'integer',
+        'jumlah_disimpan' => 'integer',
         'tahun_lulus' => 'integer',
         'dokumen_asli_dilihat' => 'boolean',
         'identitas_cocok' => 'boolean',
@@ -80,12 +86,15 @@ class Legalisir extends Model
     ];
 
     public const STATUSES = [
+        'tercatat' => 'Tercatat & Selesai',
         'diterima' => 'Permohonan Diterima',
         'diproses' => 'Sedang Diverifikasi / Diproses',
         'siap_diambil' => 'Selesai & Siap Diambil',
         'diambil' => 'Sudah Diambil',
         'ditolak' => 'Ditolak / Berkas Tidak Sesuai',
     ];
+
+    public const MAKSIMAL_DOKUMEN_DIBAWA = 6;
 
     private const STATUS_TRANSITIONS = [
         'diterima' => ['diproses', 'ditolak'],
@@ -118,6 +127,12 @@ class Legalisir extends Model
             $legalisir->status_pemohon ??= 'alumni';
             $legalisir->kanal_notifikasi ??= 'tidak_ada';
             $legalisir->jumlah_lembar ??= 1;
+            $legalisir->jumlah_dibawa ??= $legalisir->jumlah_lembar;
+            $legalisir->jumlah_disimpan ??= 1;
+            $legalisir->jumlah_dikembalikan ??= max(0, (int) $legalisir->jumlah_dibawa - (int) $legalisir->jumlah_disimpan);
+            // Kolom lama dipertahankan sebagai cermin untuk kompatibilitas data,
+            // ekspor lama, dan rollback aplikasi.
+            $legalisir->jumlah_lembar = $legalisir->jumlah_dibawa;
             $legalisir->lokasi_arsip_fisik = trim((string) $legalisir->lokasi_arsip_fisik) ?: null;
             if (! array_key_exists('biaya', $legalisir->getAttributes()) || $legalisir->getAttributes()['biaya'] === null) {
                 $legalisir->setAttribute('biaya', 0);
@@ -170,8 +185,19 @@ class Legalisir extends Model
                 throw ValidationException::withMessages(['lokasi_arsip_fisik' => 'Lokasi arsip maksimal 150 karakter dan tidak boleh mengandung karakter kontrol.']);
             }
             $attributes = $legalisir->getAttributes();
-            if (! preg_match('/^\d+$/D', (string) ($attributes['jumlah_lembar'] ?? '')) || (int) $legalisir->jumlah_lembar < 1 || (int) $legalisir->jumlah_lembar > 10000) {
-                throw ValidationException::withMessages(['jumlah_lembar' => 'Jumlah lembar harus antara 1 dan 10.000.']);
+            foreach (['jumlah_dibawa', 'jumlah_dikembalikan', 'jumlah_disimpan'] as $field) {
+                if (! preg_match('/^\d+$/D', (string) ($attributes[$field] ?? ''))) {
+                    throw ValidationException::withMessages([$field => 'Jumlah dokumen harus berupa bilangan bulat.']);
+                }
+            }
+            if ((int) $legalisir->jumlah_dibawa < 1 || (int) $legalisir->jumlah_dibawa > self::MAKSIMAL_DOKUMEN_DIBAWA) {
+                throw ValidationException::withMessages(['jumlah_dibawa' => 'Jumlah dokumen yang dibawa harus antara 1 dan '.self::MAKSIMAL_DOKUMEN_DIBAWA.'.']);
+            }
+            if ((int) $legalisir->jumlah_disimpan !== 1) {
+                throw ValidationException::withMessages(['jumlah_disimpan' => 'Satu dokumen wajib disimpan sebagai arsip TU.']);
+            }
+            if ((int) $legalisir->jumlah_dikembalikan !== (int) $legalisir->jumlah_dibawa - 1) {
+                throw ValidationException::withMessages(['jumlah_dikembalikan' => 'Jumlah yang dikembalikan harus sama dengan jumlah dibawa dikurangi satu arsip TU.']);
             }
             if (! is_numeric($attributes['biaya'] ?? null) || (float) $legalisir->biaya < 0 || (float) $legalisir->biaya > 9_999_999_999.99) {
                 throw ValidationException::withMessages(['biaya' => 'Biaya harus berupa angka 0 sampai 9.999.999.999,99.']);
@@ -194,11 +220,11 @@ class Legalisir extends Model
                 $legalisir->nomor_legalisir = static::generateNomorLegalisir($tahun);
             }
 
-            if (! $legalisir->nomor_antrean) {
+            if ($legalisir->status !== 'tercatat' && ! $legalisir->nomor_antrean) {
                 $legalisir->nomor_antrean = static::generateNomorAntrean($legalisir->tanggal_permohonan);
             }
 
-            if (! $legalisir->tracking_token_hash) {
+            if ($legalisir->status !== 'tercatat' && ! $legalisir->tracking_token_hash) {
                 $token = Str::random(48);
                 $legalisir->tracking_token_hash = hash('sha256', $token);
                 $legalisir->tracking_token_encrypted = $token;

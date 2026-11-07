@@ -469,7 +469,8 @@ class RoleAuthorizationTest extends TestCase
 
         $this->get(LegalisirResource::getUrl('create'))
             ->assertOk()
-            ->assertSee('Lokasi Arsip Fisik / Kode Penyimpanan')
+            ->assertSee('Jumlah Dokumen &amp; Arsip TU', false)
+            ->assertSee('Lokasi Arsip Fisik')
             ->assertDontSee('Biaya Administrasi')
             ->assertDontSee('Email Pemohon')
             ->assertDontSee('Notifikasi Saat Siap')
@@ -482,9 +483,10 @@ class RoleAuthorizationTest extends TestCase
                 'kontak' => '081234567890',
                 'status_pemohon' => 'alumni',
                 'jenis_dokumen' => 'Ijazah',
-                'jumlah_lembar' => 2,
+                'jumlah_dibawa' => 6,
+                'jumlah_dikembalikan' => 5,
+                'jumlah_disimpan' => 1,
                 'lokasi_arsip_fisik' => 'Loker 7 / Rak C / LEG-77',
-                'status' => 'diterima',
             ])
             ->call('create')
             ->assertHasNoFormErrors();
@@ -496,6 +498,11 @@ class RoleAuthorizationTest extends TestCase
             'kanal_notifikasi' => 'tidak_ada',
             'nomor_dokumen' => null,
             'lokasi_arsip_fisik' => 'Loker 7 / Rak C / LEG-77',
+            'jumlah_lembar' => 6,
+            'jumlah_dibawa' => 6,
+            'jumlah_dikembalikan' => 5,
+            'jumlah_disimpan' => 1,
+            'status' => 'tercatat',
             'biaya' => 0,
         ]);
         $legalisir = Legalisir::where('nama_pemohon', 'Pemohon Arsip Loker')->firstOrFail();
@@ -506,13 +513,13 @@ class RoleAuthorizationTest extends TestCase
             ->assertCanSeeTableRecords([$legalisir]);
 
         Livewire::test(ListLegalisirs::class)
-            ->assertTableActionExists('mulai_proses')
-            ->assertTableActionExists('tandai_siap')
-            ->assertTableActionExists('tolak_permohonan')
-            ->assertTableActionExists('tandai_diambil')
-            ->callTableAction('mulai_proses', $legalisir)
-            ->assertHasNoTableActionErrors();
-        $this->assertSame('diproses', $legalisir->refresh()->status);
+            ->assertTableColumnExists('jenis_dokumen')
+            ->assertTableColumnDoesNotExist('status')
+            ->assertTableActionDoesNotExist('mulai_proses')
+            ->assertTableActionDoesNotExist('tandai_siap')
+            ->assertTableActionDoesNotExist('tolak_permohonan')
+            ->assertTableActionDoesNotExist('tandai_diambil');
+        $this->assertSame('tercatat', $legalisir->refresh()->status);
 
         $this->assertContains('lokasi_arsip_fisik', TuDataExchange::template('legalisir')[0]);
         $this->assertSame(1, TuDataExchange::query('legalisir', 'LEG-77', null, null)->count());
@@ -521,6 +528,9 @@ class RoleAuthorizationTest extends TestCase
         $locationColumn = array_search('lokasi_arsip_fisik', $export[0], true);
         $this->assertNotFalse($locationColumn);
         $this->assertSame('Loker 7 / Rak C / LEG-77', $export[1][$locationColumn]);
+        $this->assertContains('jumlah_dibawa', $export[0]);
+        $this->assertContains('jumlah_dikembalikan', $export[0]);
+        $this->assertContains('jumlah_disimpan', $export[0]);
     }
 
     public function test_form_tabel_dan_pertukaran_surat_masuk_memakai_input_ringkas(): void

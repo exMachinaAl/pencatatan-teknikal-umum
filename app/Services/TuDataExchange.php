@@ -53,10 +53,10 @@ final class TuDataExchange
             ],
             'legalisir' => [
                 'model' => Legalisir::class, 'date' => 'tanggal_permohonan', 'search' => ['nomor_legalisir', 'nama_pemohon', 'kontak', 'jenis_dokumen', 'lokasi_arsip_fisik'],
-                'columns' => ['nomor_legalisir', 'tanggal_permohonan', 'nama_pemohon', 'kontak', 'status_pemohon', 'jenis_dokumen', 'jumlah_lembar', 'lokasi_arsip_fisik', 'status', 'catatan', 'tautan_lampiran'],
-                'required' => ['tanggal_permohonan', 'nama_pemohon', 'jenis_dokumen'],
+                'columns' => ['nomor_legalisir', 'tanggal_permohonan', 'nama_pemohon', 'kontak', 'status_pemohon', 'jenis_dokumen', 'tahun_lulus', 'jumlah_dibawa', 'jumlah_dikembalikan', 'jumlah_disimpan', 'lokasi_arsip_fisik', 'catatan', 'tautan_lampiran'],
+                'required' => ['tanggal_permohonan', 'nama_pemohon', 'jenis_dokumen', 'jumlah_dibawa', 'jumlah_dikembalikan', 'jumlah_disimpan', 'lokasi_arsip_fisik'],
                 'dates' => ['tanggal_permohonan'],
-                'enums' => ['status_pemohon' => array_keys(Legalisir::STATUS_PEMOHON), 'status' => array_keys(Legalisir::STATUSES)],
+                'enums' => ['status_pemohon' => array_keys(Legalisir::STATUS_PEMOHON)],
                 'lengths' => ['nomor_legalisir' => 50, 'nama_pemohon' => 150, 'kontak' => 60, 'jenis_dokumen' => 100, 'lokasi_arsip_fisik' => 150, 'catatan' => 20000, 'tautan_lampiran' => 500],
             ],
         ];
@@ -73,7 +73,7 @@ final class TuDataExchange
         $samples = [
             'surat_masuk' => ['', '012/INST/2026', '2026-10-18', '2026-10-19', 'Dinas Pendidikan', '421.1', 'Lemari A / Rak 1', 'https://drive.google.com/file/d/contoh/view'],
             'surat_keluar' => ['001/TU/2026', '2026-10-19', 'Dinas Pendidikan', '421.1', 'Lemari B', 'https://docs.google.com/spreadsheets/d/contoh/edit'],
-            'legalisir' => ['', '2026-10-19', 'Nama Pemohon', '081234567890', 'alumni', 'Ijazah', '2', 'Loker 2 / Rak B / LEG-2026', 'diterima', 'Bawa ijazah asli', 'https://drive.google.com/file/d/contoh/view'],
+            'legalisir' => ['', '2026-10-19', 'Nama Pemohon', '081234567890', 'alumni', 'Ijazah', '2024', '6', '5', '1', 'Loker 2 / Map Ijazah / LEG-2026', 'Satu dokumen disimpan sebagai arsip TU', 'https://drive.google.com/file/d/contoh/view'],
         ];
 
         return [$config['columns'], $samples[$module]];
@@ -340,8 +340,17 @@ final class TuDataExchange
                     throw new RuntimeException($field.' tidak sesuai pilihan yang tersedia.');
                 }
             }
-            if ($field === 'jumlah_lembar' && (! ctype_digit($v) || (int) $v < 1 || (int) $v > 10000)) {
-                throw new RuntimeException('jumlah_lembar harus angka 1–10000.');
+            if (in_array($field, ['jumlah_dibawa', 'jumlah_dikembalikan', 'jumlah_disimpan'], true) && ! ctype_digit($v)) {
+                throw new RuntimeException($field.' harus berupa bilangan bulat.');
+            }
+            if ($field === 'jumlah_dibawa' && ((int) $v < 1 || (int) $v > Legalisir::MAKSIMAL_DOKUMEN_DIBAWA)) {
+                throw new RuntimeException('jumlah_dibawa harus antara 1 dan '.Legalisir::MAKSIMAL_DOKUMEN_DIBAWA.'.');
+            }
+            if ($field === 'jumlah_disimpan' && (int) $v !== 1) {
+                throw new RuntimeException('jumlah_disimpan harus 1 dokumen arsip TU.');
+            }
+            if ($field === 'tahun_lulus' && (! ctype_digit($v) || (int) $v < 1900 || (int) $v > (int) date('Y'))) {
+                throw new RuntimeException('tahun_lulus tidak valid.');
             }
             if (in_array($field, ['tautan_gform', 'tautan_lampiran'], true)
                 && (filter_var($v, FILTER_VALIDATE_URL) === false || strtolower((string) parse_url($v, PHP_URL_SCHEME)) !== 'https')) {
@@ -353,6 +362,10 @@ final class TuDataExchange
             if ($out[$field] === null) {
                 throw new RuntimeException($field.' wajib diisi.');
             }
+        }
+        if (array_key_exists('jumlah_dibawa', $out)
+            && (int) $out['jumlah_dikembalikan'] !== (int) $out['jumlah_dibawa'] - (int) $out['jumlah_disimpan']) {
+            throw new RuntimeException('Jumlah dikembalikan harus sama dengan jumlah dibawa dikurangi jumlah disimpan.');
         }
 
         return $out;
@@ -419,8 +432,8 @@ final class TuDataExchange
                     SuratKeluar::create($row);
                 } else {
                     $row['nomor_legalisir'] = $row['nomor_legalisir'] ?: Legalisir::generateNomorLegalisir((int) substr($row['tanggal_permohonan'], 0, 4));
-                    $row['jumlah_lembar'] ??= 1;
-                    $row['status'] ??= 'diterima';
+                    $row['jumlah_lembar'] = $row['jumlah_dibawa'];
+                    $row['status'] = 'tercatat';
                     $row['status_pemohon'] ??= 'alumni';
                     $row['petugas_id'] = $userId;
                     Legalisir::create($row);

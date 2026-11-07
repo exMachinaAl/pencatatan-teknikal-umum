@@ -6,7 +6,6 @@ use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\LegalisirResource\Pages;
 use App\Models\AuditLog;
 use App\Models\Legalisir;
-use App\Support\ConcurrentRecordUpdate;
 use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -14,7 +13,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Response;
 
 class LegalisirResource extends Resource
@@ -27,9 +25,9 @@ class LegalisirResource extends Resource
 
     protected static ?string $navigationGroup = 'Layanan Publik';
 
-    protected static ?string $modelLabel = 'Legalisir Dokumen';
+    protected static ?string $modelLabel = 'Catatan Legalisir';
 
-    protected static ?string $pluralModelLabel = 'Layanan Legalisir';
+    protected static ?string $pluralModelLabel = 'Catatan Legalisir';
 
     protected static ?int $navigationSort = 1;
 
@@ -40,148 +38,102 @@ class LegalisirResource extends Resource
 
     public static function form(Form $form): Form
     {
-        return $form
-            ->schema([
-                Forms\Components\Section::make('Identitas Pemohon & Dokumen')
-                    ->schema([
-                        Forms\Components\TextInput::make('nomor_legalisir')
-                            ->label('Nomor Registrasi Legalisir')
-                            ->helperText('Dihasilkan otomatis ketika data disimpan dan tidak dapat diubah.')
-                            ->placeholder('Otomatis saat disimpan')
-                            ->disabled()
-                            ->dehydrated(false),
+        return $form->schema([
+            Forms\Components\Section::make('Identitas Pemohon & Dokumen')
+                ->description('Legalisir dicatat sekali setelah dilayani. Tidak ada tahap ditolak, diproses, siap, atau diambil di aplikasi.')
+                ->schema([
+                    Forms\Components\TextInput::make('nomor_legalisir')
+                        ->label('Nomor Registrasi')
+                        ->helperText('Dihasilkan otomatis saat data disimpan.')
+                        ->placeholder('Otomatis saat disimpan')
+                        ->disabled()
+                        ->dehydrated(false),
+                    Forms\Components\DatePicker::make('tanggal_permohonan')
+                        ->label('Tanggal Legalisir')
+                        ->default(now())
+                        ->required()
+                        ->displayFormat('d/m/Y'),
+                    Forms\Components\TextInput::make('nama_pemohon')
+                        ->label('Nama Lengkap Pemohon')
+                        ->required()
+                        ->maxLength(150),
+                    Forms\Components\TextInput::make('kontak')
+                        ->label('No. Telepon / WhatsApp')
+                        ->tel()
+                        ->maxLength(60)
+                        ->placeholder('08xxxxxxxxxx'),
+                    Forms\Components\Select::make('status_pemohon')
+                        ->label('Status Pemohon')
+                        ->options(Legalisir::STATUS_PEMOHON)
+                        ->default('alumni')
+                        ->required(),
+                    Forms\Components\Select::make('jenis_dokumen')
+                        ->label('Jenis Dokumen')
+                        ->options(Legalisir::JENIS_DOKUMEN)
+                        ->default('Ijazah')
+                        ->required(),
+                    Forms\Components\TextInput::make('tahun_lulus')
+                        ->label('Tahun Lulus')
+                        ->numeric()
+                        ->minValue(1950)
+                        ->maxValue((int) date('Y')),
+                ])->columns(2),
 
-                        Forms\Components\DatePicker::make('tanggal_permohonan')
-                            ->label('Tanggal Permohonan')
-                            ->default(now())
-                            ->required()
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\TextInput::make('nama_pemohon')
-                            ->label('Nama Lengkap Pemohon')
-                            ->placeholder('Nama alumni / siswa / wali')
-                            ->required()
-                            ->maxLength(150),
-
-                        Forms\Components\TextInput::make('kontak')
-                            ->label('No. Telepon / WhatsApp')
-                            ->tel()
-                            ->maxLength(60)
-                            ->placeholder('08xxxxxxxxxx'),
-
-                        Forms\Components\Select::make('status_pemohon')
-                            ->label('Status Pemohon')
-                            ->options(Legalisir::STATUS_PEMOHON)
-                            ->default('alumni')
-                            ->required(),
-
-                        Forms\Components\Select::make('jenis_dokumen')
-                            ->label('Jenis Dokumen')
-                            ->options(Legalisir::JENIS_DOKUMEN)
-                            ->default('Ijazah')
-                            ->required(),
-
-                        Forms\Components\TextInput::make('lokasi_arsip_fisik')
-                            ->label('Lokasi Arsip Fisik / Kode Penyimpanan')
-                            ->placeholder('Contoh: Loker 2 / Rak B / Kode LEG-2026')
-                            ->helperText('Gunakan penamaan yang mudah dicari kembali melalui tabel dan pencarian terpadu.')
-                            ->maxLength(150),
-
-                        Forms\Components\TextInput::make('tahun_lulus')
-                            ->label('Tahun Lulus')
-                            ->numeric()
-                            ->minValue(1950)
-                            ->maxValue((int) date('Y')),
-
-                        Forms\Components\TextInput::make('jumlah_lembar')
-                            ->label('Jumlah Lembar / Rangkap')
-                            ->numeric()
-                            ->default(1)
-                            ->minValue(1)
-                            ->maxValue(10000)
-                            ->required(),
-
-                    ])->columns(2),
-
-                Forms\Components\Section::make('Status Pemrosesan & Pengambilan')
-                    ->description('Bagian sensitif: status siap/diambil divalidasi di server, dicatat per akun, dan memerlukan checklist lengkap.')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\Select::make('status')
-                            ->label('Status Alur Legalisir')
-                            ->options(Legalisir::STATUSES)
-                            ->default('diterima')
-                            ->disabled()
-                            ->dehydrated(false)
-                            ->helperText('Gunakan aksi pada tabel untuk perubahan status operasional agar identitas pemeriksa tercatat.')
-                            ->required()
-                            ->reactive(),
-
-                        Forms\Components\DatePicker::make('tanggal_selesai')
-                            ->label('Tanggal Selesai / Siap Diambil')
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\DateTimePicker::make('jadwal_pengambilan')
-                            ->label('Jadwal Pengambilan')
-                            ->seconds(false),
-
-                        Forms\Components\DatePicker::make('tanggal_diambil')
-                            ->label('Tanggal Penyerahan / Diambil')
-                            ->displayFormat('d/m/Y'),
-
-                        Forms\Components\TextInput::make('pengambil')
-                            ->label('Nama Penerima / Pengambil Dokumen')
-                            ->placeholder('Nama yang mengambil (jika diwakilkan)'),
-
-                        Forms\Components\TextInput::make('hubungan_pengambil')
-                            ->label('Hubungan dengan Pemohon'),
-
-                        Forms\Components\FileUpload::make('bukti_serah_terima_path')
-                            ->label('Bukti Serah Terima')
-                            ->disk('local')
-                            ->directory('legalisir_serah_terima')
-                            ->visibility('private')
-                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-                            ->maxSize(5120),
-
-                        Forms\Components\Fieldset::make('Checklist Verifikasi')
-                            ->schema([
-                                Forms\Components\Checkbox::make('dokumen_asli_dilihat')->label('Dokumen asli telah dilihat'),
-                                Forms\Components\Checkbox::make('identitas_cocok')->label('Identitas pemohon cocok'),
-                                Forms\Components\Checkbox::make('data_sekolah_cocok')->label('Data sekolah cocok'),
-                            ])->columns(1)->columnSpanFull(),
-
-                        Forms\Components\FileUpload::make('file_dokumen_path')
-                            ->label('Scan Dokumen Asli / Berkas Verifikasi (PDF/JPG/PNG)')
-                            ->disk('local')
-                            ->directory('legalisir_dokumen')
-                            ->visibility('private')
-                            ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
-                            ->maxSize(5120)
-                            ->columnSpanFull(),
-
-                        Forms\Components\TextInput::make('tautan_lampiran')
-                            ->label('Tautan Google Drive / Sheets / Lampiran')
-                            ->placeholder('https://drive.google.com/... atau https://docs.google.com/spreadsheets/...')
-                            ->url()
-                            ->rules(['nullable', 'starts_with:https://'])
-                            ->maxLength(500)
-                            ->helperText('Opsional. Gunakan tautan HTTPS dan batasi akses di Google untuk dokumen sensitif.')
-                            ->columnSpanFull(),
-
-                        Forms\Components\Textarea::make('catatan')
-                            ->label('Catatan Petugas (Tahun Lulus, No Seri Ijazah, dll)')
-                            ->rows(3)
-                            ->columnSpanFull(),
-
-                        Forms\Components\Textarea::make('alasan_penolakan')
-                            ->label('Alasan Penolakan')
-                            ->rows(2)
-                            ->visible(fn (Forms\Get $get): bool => $get('status') === 'ditolak')
-                            ->columnSpanFull(),
-                    ])->columns(2),
-            ]);
+            Forms\Components\Section::make('Jumlah Dokumen & Arsip TU')
+                ->description('Maksimal 6 dokumen dibawa. Sistem menghitung jumlah kembali; satu dokumen selalu disimpan sebagai arsip TU.')
+                ->schema([
+                    Forms\Components\Select::make('jumlah_dibawa')
+                        ->label('Jumlah Dibawa')
+                        ->options(array_combine(
+                            range(1, Legalisir::MAKSIMAL_DOKUMEN_DIBAWA),
+                            range(1, Legalisir::MAKSIMAL_DOKUMEN_DIBAWA),
+                        ))
+                        ->default(2)
+                        ->required()
+                        ->live()
+                        ->afterStateUpdated(function ($state, callable $set): void {
+                            $set('jumlah_disimpan', 1);
+                            $set('jumlah_dikembalikan', max(0, (int) $state - 1));
+                        }),
+                    Forms\Components\TextInput::make('jumlah_dikembalikan')
+                        ->label('Dikembalikan ke Pemohon')
+                        ->default(1)
+                        ->disabled()
+                        ->dehydrated(),
+                    Forms\Components\TextInput::make('jumlah_disimpan')
+                        ->label('Disimpan sebagai Arsip TU')
+                        ->default(1)
+                        ->disabled()
+                        ->dehydrated(),
+                    Forms\Components\TextInput::make('lokasi_arsip_fisik')
+                        ->label('Lokasi Arsip Fisik')
+                        ->placeholder('Contoh: Loker 2 / Map Ijazah / LEG-2026')
+                        ->helperText('Wajib diisi dan dapat dicari dari tabel maupun pencarian terpadu.')
+                        ->required()
+                        ->maxLength(150),
+                    Forms\Components\FileUpload::make('file_dokumen_path')
+                        ->label('Scan Dokumen Arsip (PDF / JPG / PNG)')
+                        ->disk('local')
+                        ->directory('legalisir_dokumen')
+                        ->visibility('private')
+                        ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])
+                        ->maxSize(5120)
+                        ->columnSpanFull(),
+                    Forms\Components\TextInput::make('tautan_lampiran')
+                        ->label('Tautan Google Drive / Sheets / Lampiran')
+                        ->placeholder('https://drive.google.com/...')
+                        ->url()
+                        ->rules(['nullable', 'starts_with:https://'])
+                        ->maxLength(500)
+                        ->helperText('Opsional. Gunakan HTTPS dan batasi akses Google untuk dokumen sensitif.')
+                        ->columnSpanFull(),
+                    Forms\Components\Textarea::make('catatan')
+                        ->label('Catatan Petugas')
+                        ->placeholder('Contoh: nomor seri ijazah atau keterangan penyimpanan')
+                        ->rows(3)
+                        ->columnSpanFull(),
+                ])->columns(3),
+        ]);
     }
 
     public static function table(Table $table): Table
@@ -193,29 +145,27 @@ class LegalisirResource extends Resource
                     ->view('filament.tables.columns.document-mobile-summary', fn (Legalisir $record): array => [
                         'title' => $record->nama_pemohon,
                         'meta' => collect([
-                            $record->nomor_antrean ?: $record->nomor_legalisir,
-                            trim("{$record->jenis_dokumen} · {$record->jumlah_lembar} lembar"),
-                            $record->lokasi_arsip_fisik,
+                            $record->nomor_legalisir,
+                            $record->jenis_dokumen,
+                            "Dibawa {$record->jumlah_dibawa}, kembali {$record->jumlah_dikembalikan}, arsip {$record->jumlah_disimpan}",
+                            $record->lokasi_arsip_fisik ? "Lokasi {$record->lokasi_arsip_fisik}" : null,
                             $record->tanggal_permohonan?->translatedFormat('d M Y'),
-                            Legalisir::STATUSES[$record->status] ?? $record->status,
                         ])->filter()->implode(' · '),
                         'externalAttribute' => 'tautan_lampiran',
                     ])
                     ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
                     ->hiddenFrom('lg'),
-
-                Tables\Columns\TextColumn::make('nomor_antrean')
-                    ->label('No. Antrean')
-                    ->searchable()
+                Tables\Columns\TextColumn::make('nomor_legalisir')
+                    ->label('No. Registrasi')
+                    ->searchable(['nomor_legalisir', 'nomor_antrean'])
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn (Legalisir $record) => $record->nomor_legalisir)
+                    ->description(fn (Legalisir $record) => $record->tanggal_permohonan?->translatedFormat('d M Y'))
                     ->extraCellAttributes(['class' => 'tu-table-primary'])
                     ->visibleFrom('lg'),
-
                 Tables\Columns\TextColumn::make('nama_pemohon')
-                    ->label('Nama Pemohon')
-                    ->searchable()
+                    ->label('Pemohon')
+                    ->searchable(['nama_pemohon', 'kontak'])
                     ->sortable()
                     ->weight('semibold')
                     ->description(fn (Legalisir $record): string => collect([
@@ -225,179 +175,50 @@ class LegalisirResource extends Resource
                     ->wrap()
                     ->extraCellAttributes(['class' => 'tu-table-primary'])
                     ->visibleFrom('lg'),
-
                 Tables\Columns\TextColumn::make('jenis_dokumen')
                     ->label('Dokumen')
                     ->badge()
                     ->color('info')
-                    ->description(fn (Legalisir $record): string => collect([
-                        "{$record->jumlah_lembar} lembar",
-                        $record->tanggal_permohonan?->translatedFormat('d M Y'),
-                    ])->filter()->implode(' · '))
+                    ->description(fn (Legalisir $record): string => "Dibawa {$record->jumlah_dibawa} · Kembali {$record->jumlah_dikembalikan} · Arsip {$record->jumlah_disimpan}")
                     ->extraCellAttributes(['class' => 'tu-table-secondary'])
                     ->visibleFrom('lg'),
-
-                Tables\Columns\BadgeColumn::make('status')
-                    ->label('Status')
-                    ->colors([
-                        'info' => 'diterima',
-                        'warning' => 'diproses',
-                        'success' => 'siap_diambil',
-                        'primary' => 'diambil',
-                        'danger' => 'ditolak',
-                    ])
-                    ->formatStateUsing(fn ($state) => Legalisir::STATUSES[$state] ?? $state)
-                    ->sortable()
-                    ->extraCellAttributes(['class' => 'tu-table-status'])
+                Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
+                    ->label('Lokasi Arsip')
+                    ->searchable()
+                    ->placeholder('Belum dicatat')
+                    ->limit(28)
+                    ->wrap()
+                    ->extraCellAttributes(['class' => 'tu-table-archive'])
                     ->visibleFrom('lg'),
-
                 Tables\Columns\ViewColumn::make('document_links')
                     ->label('Lampiran')
                     ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_lampiran'])
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
                     ->visibleFrom('lg'),
-
-                Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
-                    ->label('Lokasi Arsip')
-                    ->searchable()
-                    ->placeholder('-')
-                    ->limit(28)
-                    ->wrap()
-                    ->extraCellAttributes(['class' => 'tu-table-archive'])
-                    ->visibleFrom('lg'),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('lampiran'))
+            ->defaultSort('tanggal_permohonan', 'desc')
             ->filters([
-                Tables\Filters\Filter::make('perlu_tindak_lanjut')
-                    ->label('Menunggu verifikasi / proses')
-                    ->query(fn (Builder $query) => $query->perluTindakLanjut()),
-
-                Tables\Filters\SelectFilter::make('status')
-                    ->label('Status Legalisir')
-                    ->options(Legalisir::STATUSES),
-
                 Tables\Filters\SelectFilter::make('jenis_dokumen')
                     ->label('Jenis Dokumen')
                     ->options(Legalisir::JENIS_DOKUMEN),
-
                 Tables\Filters\SelectFilter::make('status_pemohon')
                     ->label('Status Pemohon')
                     ->options(Legalisir::STATUS_PEMOHON),
-
                 Tables\Filters\Filter::make('periode')
                     ->form([
                         Forms\Components\DatePicker::make('dari_tanggal')->label('Dari Tanggal'),
                         Forms\Components\DatePicker::make('sampai_tanggal')->label('Sampai Tanggal'),
                     ])
-                    ->query(function (Builder $query, array $data) {
-                        return $query
-                            ->when($data['dari_tanggal'], fn ($q, $d) => $q->whereDate('tanggal_permohonan', '>=', $d))
-                            ->when($data['sampai_tanggal'], fn ($q, $d) => $q->whereDate('tanggal_permohonan', '<=', $d));
-                    }),
-
+                    ->query(fn (Builder $query, array $data) => $query
+                        ->when($data['dari_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_permohonan', '>=', $date))
+                        ->when($data['sampai_tanggal'], fn ($q, $date) => $q->whereDate('tanggal_permohonan', '<=', $date))),
                 Tables\Filters\TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\ViewAction::make()->label('Lihat detail'),
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\Action::make('cetak_bukti')
-                        ->label('Cetak Bukti Penerimaan')
-                        ->icon('heroicon-o-printer')
-                        ->color('success')
-                        ->authorize(fn (): bool => static::resourcePermission('print'))
-                        ->url(fn (Legalisir $record) => route('legalisir.cetak-bukti', $record->id))
-                        ->openUrlInNewTab(),
-                    Tables\Actions\Action::make('mulai_proses')
-                        ->label('Mulai Verifikasi')
-                        ->icon('heroicon-o-play')
-                        ->color('info')
-                        ->requiresConfirmation()
-                        ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (Legalisir $record): bool => $record->status === 'diterima')
-                        ->action(function (Legalisir $record): void {
-                            static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
-                                'status' => 'diproses',
-                                'petugas_id' => Auth::id(),
-                            ]));
-                        })
-                        ->after(fn ($livewire) => $livewire->resetTable()),
-                    Tables\Actions\Action::make('tandai_siap')
-                        ->label('Tandai Siap Diambil')
-                        ->icon('heroicon-o-check')
-                        ->color('warning')
-                        ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (Legalisir $record): bool => $record->status === 'diproses')
-                        ->form([
-                            Forms\Components\Checkbox::make('dokumen_asli_dilihat')->label('Dokumen asli telah dilihat')->accepted()->required(),
-                            Forms\Components\Checkbox::make('identitas_cocok')->label('Identitas pemohon cocok')->accepted()->required(),
-                            Forms\Components\Checkbox::make('data_sekolah_cocok')->label('Data sekolah cocok')->accepted()->required(),
-                            Forms\Components\DateTimePicker::make('jadwal_pengambilan')->label('Jadwal Pengambilan')->default(now()->addDay())->required()->seconds(false),
-                        ])
-                        ->action(function (Legalisir $record, array $data) {
-                            static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
-                                'status' => 'siap_diambil',
-                                'tanggal_selesai' => now(),
-                                'diverifikasi_oleh' => Auth::id(),
-                                'diverifikasi_pada' => now(),
-                                ...$data,
-                            ]));
-                        })
-                        ->after(fn ($livewire) => $livewire->resetTable()),
-                    Tables\Actions\Action::make('tolak_permohonan')
-                        ->label('Tolak Permohonan')
-                        ->icon('heroicon-o-x-circle')
-                        ->color('danger')
-                        ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (Legalisir $record): bool => in_array($record->status, ['diterima', 'diproses'], true))
-                        ->form([
-                            Forms\Components\Textarea::make('alasan_penolakan')
-                                ->label('Alasan Penolakan')
-                                ->required()
-                                ->maxLength(20000),
-                        ])
-                        ->action(function (Legalisir $record, array $data): void {
-                            static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
-                                'status' => 'ditolak',
-                                'alasan_penolakan' => $data['alasan_penolakan'],
-                                'petugas_id' => Auth::id(),
-                            ]));
-                        })
-                        ->after(fn ($livewire) => $livewire->resetTable()),
-                    Tables\Actions\Action::make('tandai_diambil')
-                        ->label('Tandai Sudah Diambil')
-                        ->icon('heroicon-o-hand-thumb-up')
-                        ->color('primary')
-                        ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (Legalisir $record): bool => $record->status === 'siap_diambil')
-                        ->form([
-                            Forms\Components\TextInput::make('pengambil')
-                                ->label('Nama Pengambil')
-                                ->default(fn (Legalisir $record) => $record->nama_pemohon)
-                                ->required(),
-                            Forms\Components\TextInput::make('hubungan_pengambil')
-                                ->label('Hubungan dengan Pemohon')
-                                ->default('Diri sendiri')
-                                ->required(),
-                            Forms\Components\FileUpload::make('bukti_serah_terima_path')
-                                ->label('Bukti Serah Terima')
-                                ->disk('local')->directory('legalisir_serah_terima')->visibility('private')
-                                ->acceptedFileTypes(['application/pdf', 'image/jpeg', 'image/png'])->maxSize(5120),
-                        ])
-                        ->action(function (Legalisir $record, array $data) {
-                            static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, fn (Legalisir $locked) => $locked->update([
-                                'status' => 'diambil',
-                                'pengambil' => $data['pengambil'],
-                                'hubungan_pengambil' => $data['hubungan_pengambil'],
-                                'bukti_serah_terima_path' => $data['bukti_serah_terima_path'] ?? null,
-                                'tanggal_diambil' => now(),
-                            ]));
-                        })
-                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -416,29 +237,28 @@ class LegalisirResource extends Resource
                                 'Content-Disposition' => 'attachment; filename="legalisir-'.date('Ymd-His').'.csv"',
                             ];
 
-                            $callback = function () use ($records) {
+                            return Response::stream(function () use ($records): void {
                                 $handle = fopen('php://output', 'w');
-                                SecureCsv::writeRow($handle, ['No Registrasi', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Jumlah Lembar', 'Lokasi Arsip', 'Tgl Permohonan', 'Tgl Selesai', 'Tgl Diambil', 'Pengambil', 'Status']);
+                                SecureCsv::writeRow($handle, ['No Registrasi', 'Tanggal', 'Nama Pemohon', 'Kontak', 'Status Pemohon', 'Jenis Dokumen', 'Tahun Lulus', 'Jumlah Dibawa', 'Jumlah Dikembalikan', 'Jumlah Disimpan', 'Lokasi Arsip', 'Tautan Lampiran', 'Catatan']);
                                 foreach ($records as $row) {
                                     SecureCsv::writeRow($handle, [
                                         $row->nomor_legalisir,
+                                        $row->tanggal_permohonan?->format('Y-m-d'),
                                         $row->nama_pemohon,
                                         $row->kontak,
                                         $row->status_pemohon,
                                         $row->jenis_dokumen,
-                                        $row->jumlah_lembar,
+                                        $row->tahun_lulus,
+                                        $row->jumlah_dibawa,
+                                        $row->jumlah_dikembalikan,
+                                        $row->jumlah_disimpan,
                                         $row->lokasi_arsip_fisik,
-                                        $row->tanggal_permohonan?->format('Y-m-d'),
-                                        $row->tanggal_selesai?->format('Y-m-d'),
-                                        $row->tanggal_diambil?->format('Y-m-d'),
-                                        $row->pengambil,
-                                        $row->status,
+                                        $row->tautan_lampiran,
+                                        $row->catatan,
                                     ]);
                                 }
                                 fclose($handle);
-                            };
-
-                            return Response::stream($callback, 200, $headers);
+                            }, 200, $headers);
                         }),
                 ]),
             ]);
@@ -446,9 +266,7 @@ class LegalisirResource extends Resource
 
     public static function getRelations(): array
     {
-        return [
-            //
-        ];
+        return [];
     }
 
     public static function getPages(): array

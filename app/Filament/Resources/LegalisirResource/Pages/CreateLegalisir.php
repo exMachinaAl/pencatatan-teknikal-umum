@@ -16,6 +16,7 @@ class CreateLegalisir extends CreateRecord
     {
         return DB::transaction(function () use ($data): Model {
             $data['petugas_id'] = Auth::id();
+            $data['status'] = 'tercatat';
 
             return static::getModel()::create($data);
         });

@@ -62,7 +62,7 @@ class GoogleFormImportSecurityTest extends TestCase
             'tanggal_diterima' => '2026-10-19 00:00:00',
             'perihal' => '',
             'sifat' => 'biasa',
-            'status' => 'baru',
+            'status' => 'diarsipkan',
             'lokasi_arsip_fisik' => 'Lemari A',
             'created_by' => $user->id,
         ]);
@@ -102,7 +102,7 @@ class GoogleFormImportSecurityTest extends TestCase
         $this->assertNull($surat->nomor_urut);
         $this->assertSame('', $surat->perihal);
         $this->assertSame('biasa', $surat->sifat);
-        $this->assertSame('draf', $surat->status);
+        $this->assertSame('diarsipkan', $surat->status);
         $this->assertNull($surat->penandatangan);
         $this->assertNull($surat->pembuat_konsep);
         $this->assertSame('421.1', $surat->klasifikasi?->kode);
@@ -114,8 +114,8 @@ class GoogleFormImportSecurityTest extends TestCase
         $this->actingAs($user);
 
         $upload = UploadedFile::fake()->createWithContent('legalisir.csv', implode("\n", [
-            'tanggal_permohonan,nama_pemohon,kontak,status_pemohon,jenis_dokumen,jumlah_lembar,lokasi_arsip_fisik,catatan',
-            '2026-10-22,Pemohon Legalisir,081200000001,alumni,Ijazah,2,Loker 9 / Rak A / LEG-9,Berkas lengkap',
+            'tanggal_permohonan,nama_pemohon,kontak,status_pemohon,jenis_dokumen,jumlah_dibawa,jumlah_dikembalikan,jumlah_disimpan,lokasi_arsip_fisik,catatan',
+            '2026-10-22,Pemohon Legalisir,081200000001,alumni,Ijazah,6,5,1,Loker 9 / Rak A / LEG-9,Berkas lengkap',
         ]));
 
         Livewire::test(GoogleFormImport::class)
@@ -133,6 +133,10 @@ class GoogleFormImportSecurityTest extends TestCase
             'kanal_notifikasi' => 'tidak_ada',
             'nomor_dokumen' => null,
             'lokasi_arsip_fisik' => 'Loker 9 / Rak A / LEG-9',
+            'jumlah_dibawa' => 6,
+            'jumlah_dikembalikan' => 5,
+            'jumlah_disimpan' => 1,
+            'status' => 'tercatat',
         ]);
     }
 

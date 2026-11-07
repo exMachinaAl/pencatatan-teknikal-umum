@@ -295,9 +295,13 @@ class GoogleFormImport extends Page implements HasForms
             'kontak' => 'No HP / WhatsApp',
             'status_pemohon' => 'Status (Alumni/Siswa/Wali)',
             'jenis_dokumen' => 'Jenis Dokumen (Ijazah/SKHUN)',
-            'jumlah_lembar' => 'Jumlah Lembar',
+            'tahun_lulus' => 'Tahun Lulus',
+            'jumlah_dibawa' => 'Jumlah Dibawa',
+            'jumlah_dikembalikan' => 'Jumlah Dikembalikan',
+            'jumlah_disimpan' => 'Jumlah Disimpan sebagai Arsip TU',
             'lokasi_arsip_fisik' => 'Lokasi Arsip Fisik / Kode Penyimpanan',
             'catatan' => 'Catatan Tambahan',
+            'tautan_lampiran' => 'Tautan Berkas Drive / Dokumen',
         ];
     }
 
@@ -410,9 +414,11 @@ class GoogleFormImport extends Page implements HasForms
                         ['kode' => $kodeKlasifikasi],
                         ['nama' => $kodeKlasifikasi],
                     )->getKey(),
-                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
+                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150, true),
                     'tautan_gform' => $this->cleanUrl($rowValues['tautan_gform']),
                     'sumber' => 'gform_import',
+                    'status' => 'diarsipkan',
+                    'diarsipkan_pada' => now(),
                     'created_by' => Auth::id(),
                 ]);
 
@@ -437,9 +443,11 @@ class GoogleFormImport extends Page implements HasForms
                         ['kode' => $kodeKlasifikasi],
                         ['nama' => $kodeKlasifikasi],
                     )->getKey(),
-                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
+                    'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150, true),
                     'tautan_gform' => $this->cleanUrl($rowValues['tautan_gform']),
                     'sumber' => 'gform_import',
+                    'status' => 'diarsipkan',
+                    'diarsipkan_pada' => now(),
                     'created_by' => Auth::id(),
                 ]);
 
@@ -460,11 +468,21 @@ class GoogleFormImport extends Page implements HasForms
                 throw new RuntimeException("Duplikat permohonan legalisir untuk {$nama}.");
             }
 
-            $jumlahLembar = trim((string) ($rowValues['jumlah_lembar'] ?? ''));
-            if ($jumlahLembar === '') {
-                $jumlahLembar = 1;
-            } elseif (! ctype_digit($jumlahLembar) || (int) $jumlahLembar < 1 || (int) $jumlahLembar > 100) {
-                throw new RuntimeException('Jumlah lembar harus berupa angka 1 sampai 100.');
+            $jumlahDibawa = trim((string) ($rowValues['jumlah_dibawa'] ?? ''));
+            $jumlahDikembalikan = trim((string) ($rowValues['jumlah_dikembalikan'] ?? ''));
+            $jumlahDisimpan = trim((string) ($rowValues['jumlah_disimpan'] ?? ''));
+            if (! ctype_digit($jumlahDibawa) || (int) $jumlahDibawa < 1 || (int) $jumlahDibawa > Legalisir::MAKSIMAL_DOKUMEN_DIBAWA) {
+                throw new RuntimeException('Jumlah dibawa harus berupa angka 1 sampai '.Legalisir::MAKSIMAL_DOKUMEN_DIBAWA.'.');
+            }
+            if (! ctype_digit($jumlahDikembalikan) || ! ctype_digit($jumlahDisimpan)
+                || (int) $jumlahDisimpan !== 1
+                || (int) $jumlahDikembalikan !== (int) $jumlahDibawa - (int) $jumlahDisimpan) {
+                throw new RuntimeException('Jumlah kembali harus sama dengan jumlah dibawa dikurangi satu arsip TU.');
+            }
+
+            $tahunLulus = trim((string) ($rowValues['tahun_lulus'] ?? ''));
+            if ($tahunLulus !== '' && (! ctype_digit($tahunLulus) || (int) $tahunLulus < 1900 || (int) $tahunLulus > (int) date('Y'))) {
+                throw new RuntimeException('Tahun lulus tidak valid.');
             }
 
             $statusPemohon = strtolower((string) ($rowValues['status_pemohon'] ?? ''));
@@ -474,11 +492,16 @@ class GoogleFormImport extends Page implements HasForms
                 'kontak' => $this->cleanText($rowValues['kontak'], 'Kontak', 60),
                 'status_pemohon' => in_array($statusPemohon, ['alumni', 'siswa', 'wali', 'lainnya'], true) ? $statusPemohon : 'alumni',
                 'jenis_dokumen' => $jenisDokumen,
-                'jumlah_lembar' => (int) $jumlahLembar,
-                'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150),
+                'tahun_lulus' => $tahunLulus === '' ? null : (int) $tahunLulus,
+                'jumlah_lembar' => (int) $jumlahDibawa,
+                'jumlah_dibawa' => (int) $jumlahDibawa,
+                'jumlah_dikembalikan' => (int) $jumlahDikembalikan,
+                'jumlah_disimpan' => (int) $jumlahDisimpan,
+                'lokasi_arsip_fisik' => $this->cleanText($rowValues['lokasi_arsip_fisik'], 'Lokasi arsip fisik', 150, true),
                 'tanggal_permohonan' => $tanggalPermohonan,
                 'catatan' => $this->cleanText($rowValues['catatan'], 'Catatan', 20000),
-                'status' => 'diterima',
+                'tautan_lampiran' => $this->cleanUrl($rowValues['tautan_lampiran']),
+                'status' => 'tercatat',
                 'petugas_id' => Auth::id(),
             ]);
         });
