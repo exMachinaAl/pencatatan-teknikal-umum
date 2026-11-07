@@ -13,10 +13,8 @@ use App\Filament\Resources\PegawaiResource;
 use App\Filament\Resources\SuratKeluarResource;
 use App\Filament\Resources\SuratMasukResource;
 use App\Filament\Resources\UserResource;
-use App\Models\Disposisi;
 use App\Models\GajiBerkala;
 use App\Models\KenaikanPangkat;
-use App\Models\Legalisir;
 use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use Filament\Widgets\Widget;
@@ -33,21 +31,16 @@ class WorkspaceOverviewWidget extends Widget
     {
         $user = auth()->user();
         $canViewSurat = $user?->canPerform('surat', 'view') ?? false;
-        $canViewLegalisir = $user?->canPerform('legalisir', 'view') ?? false;
         $canViewKepegawaian = $user?->canPerform('kepegawaian', 'view') ?? false;
 
         $suratMasuk = $canViewSurat ? SuratMasuk::query()
             ->with('klasifikasi')
-            ->whereIn('status', ['baru', 'didisposisi'])
-            ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_diterima')
             ->latest('id')
             ->first() : null;
 
         $suratKeluar = $canViewSurat ? SuratKeluar::query()
             ->with('klasifikasi')
-            ->where('status', 'draf')
-            ->orderByRaw("CASE WHEN sifat = 'segera' THEN 0 WHEN sifat = 'penting' THEN 1 ELSE 2 END")
             ->latest('tanggal_surat')
             ->latest('id')
             ->first() : null;
@@ -55,13 +48,13 @@ class WorkspaceOverviewWidget extends Widget
         $moduleDefinitions = [
             [
                 'label' => 'Surat Masuk',
-                'description' => 'Pencatatan, disposisi, dan arsip',
+                'description' => 'Register surat dan lokasi arsip',
                 'icon' => 'heroicon-o-inbox-arrow-down',
                 'resource' => SuratMasukResource::class,
             ],
             [
                 'label' => 'Surat Keluar',
-                'description' => 'Penerbitan, pengiriman, dan arsip',
+                'description' => 'Register surat dan lokasi arsip',
                 'icon' => 'heroicon-o-paper-airplane',
                 'resource' => SuratKeluarResource::class,
             ],
@@ -85,7 +78,7 @@ class WorkspaceOverviewWidget extends Widget
             ],
             [
                 'label' => 'Legalisir',
-                'description' => 'Permohonan, verifikasi, serah terima',
+                'description' => 'Catatan dokumen kembali dan arsip TU',
                 'icon' => 'heroicon-o-document-check',
                 'resource' => LegalisirResource::class,
             ],
@@ -118,47 +111,6 @@ class WorkspaceOverviewWidget extends Widget
 
         $attention = [];
 
-        if ($canViewLegalisir) {
-            $pendingLegalisir = Legalisir::perluTindakLanjut()->count();
-            if ($pendingLegalisir > 0) {
-                $attention[] = [
-                    'label' => 'Legalisir belum selesai diverifikasi',
-                    'count' => $pendingLegalisir,
-                    'detail' => 'status diterima atau sedang diproses',
-                    'url' => LegalisirResource::getUrl('index', [
-                        'tableFilters' => ['perlu_tindak_lanjut' => ['isActive' => true]],
-                    ]),
-                    'tone' => 'amber',
-                ];
-            }
-
-            $readyLegalisir = Legalisir::where('status', 'siap_diambil')->count();
-            if ($readyLegalisir > 0) {
-                $attention[] = [
-                    'label' => 'Legalisir menunggu diserahkan',
-                    'count' => $readyLegalisir,
-                    'detail' => 'dokumen sudah siap dan belum diambil',
-                    'url' => LegalisirResource::getUrl('index', [
-                        'tableFilters' => ['status' => ['value' => 'siap_diambil']],
-                    ]),
-                    'tone' => 'emerald',
-                ];
-            }
-        }
-
-        if ($canViewSurat) {
-            $overdueDispositions = Disposisi::terlambat()->count();
-            if ($overdueDispositions > 0) {
-                $attention[] = [
-                    'label' => 'Disposisi melewati tenggat',
-                    'count' => $overdueDispositions,
-                    'detail' => 'tindak lanjut surat perlu perhatian',
-                    'url' => SuratMasukResource::getUrl('index'),
-                    'tone' => 'rose',
-                ];
-            }
-        }
-
         if ($canViewKepegawaian) {
             $activeKp = KenaikanPangkat::where('status', '!=', 'diserahkan')->count();
             if ($activeKp > 0) {
@@ -186,32 +138,6 @@ class WorkspaceOverviewWidget extends Widget
         }
 
         $workflows = [];
-        if ($canViewSurat) {
-            $workflows[] = $this->workflow(
-                'Surat Masuk',
-                'Dari pencatatan sampai arsip',
-                SuratMasukResource::class,
-                SuratMasuk::class,
-                SuratMasuk::STATUSES,
-            );
-            $workflows[] = $this->workflow(
-                'Surat Keluar',
-                'Dari konsep sampai arsip',
-                SuratKeluarResource::class,
-                SuratKeluar::class,
-                SuratKeluar::STATUSES,
-            );
-        }
-        if ($canViewLegalisir) {
-            $workflows[] = $this->workflow(
-                'Legalisir',
-                'Permohonan, verifikasi, kesiapan, dan serah terima',
-                LegalisirResource::class,
-                Legalisir::class,
-                Legalisir::STATUSES,
-                ['ditolak'],
-            );
-        }
         if ($canViewKepegawaian) {
             $workflows[] = $this->workflow(
                 'Kenaikan Pangkat',
@@ -239,6 +165,7 @@ class WorkspaceOverviewWidget extends Widget
             'canViewSurat' => $canViewSurat,
             'canCreateSuratMasuk' => SuratMasukResource::canCreate(),
             'canCreateSuratKeluar' => SuratKeluarResource::canCreate(),
+            'canCreateLegalisir' => LegalisirResource::canCreate(),
             'roleLabel' => $user?->roleLabel() ?? 'Pengguna',
         ];
     }

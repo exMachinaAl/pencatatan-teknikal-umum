@@ -53,7 +53,7 @@ Kolom ini opsional. Biarkan kosong bila tidak ada lampiran eksternal.
 
 Ekspor dari aplikasi juga menyertakan kolom tautan, sehingga tautan tetap ikut saat data dibagikan melalui spreadsheet.
 
-Untuk Legalisir, isi kolom `lokasi_arsip_fisik` dengan penanda yang konsisten, misalnya `Loker 2 / Rak B / LEG-2026`. Nilai ini tampil langsung di tabel dan dapat dicari melalui pencarian tabel, pencarian terpadu, maupun filter pencarian saat ekspor.
+Untuk Legalisir, isi `jumlah_dibawa`, `jumlah_dikembalikan`, dan `jumlah_disimpan`. Maksimal jumlah dibawa adalah 6, jumlah disimpan harus 1, dan jumlah dikembalikan harus sama dengan jumlah dibawa dikurangi jumlah disimpan. Isi juga `lokasi_arsip_fisik` dengan penanda konsisten, misalnya `Loker 2 / Map Ijazah / LEG-2026`. Nilai ini tampil langsung di tabel dan dapat dicari melalui pencarian tabel, pencarian terpadu, maupun filter pencarian saat ekspor.
 
 ## Ekspor spreadsheet dan backup
 

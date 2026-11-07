@@ -791,17 +791,14 @@ class RoleAuthorizationTest extends TestCase
                 'Legalisir',
             ])
             ->assertViewHas('attention', fn (array $items): bool => count($items) === 0)
-            ->assertViewHas('workflows', fn (array $items): bool => array_column($items, 'label') === [
-                'Surat Masuk',
-                'Surat Keluar',
-                'Legalisir',
-            ])
+            ->assertViewHas('workflows', fn (array $items): bool => $items === [])
             ->assertViewHas('canViewSurat', true)
             ->assertViewHas('canCreateSuratMasuk', false)
             ->assertViewHas('canCreateSuratKeluar', false)
-            ->assertSee('Surat yang perlu dilihat')
+            ->assertSee('Catatan surat terbaru')
             ->assertDontSee('Catat surat masuk')
-            ->assertDontSee('Buat surat keluar')
+            ->assertDontSee('Catat surat keluar')
+            ->assertDontSee('Catat legalisir')
             ->assertSee('Kelola Pengguna');
     }
 

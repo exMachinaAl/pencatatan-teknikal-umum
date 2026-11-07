@@ -25,8 +25,8 @@ class StatsOverviewWidget extends BaseWidget
         // 2. Surat Keluar bulan ini
         $suratKeluarBulanIni = SuratKeluar::where('tanggal_surat', '>=', $startOfMonth)->count();
 
-        // 3. Legalisir Menunggu
-        $legalisirMenunggu = Legalisir::whereIn('status', ['diterima', 'diproses'])->count();
+        // 3. Catatan legalisir bulan ini (layanan pasif, bukan antrean proses)
+        $legalisirBulanIni = Legalisir::where('tanggal_permohonan', '>=', $startOfMonth)->count();
 
         // 4. Calon KP (TMT pangkat terakhir sudah >= 3.5 tahun atau status masih proses)
         $calonKp = Pegawai::whereNotNull('tmt_pangkat_terakhir')
@@ -52,10 +52,10 @@ class StatsOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-paper-airplane')
                 ->color('success'),
 
-            Stat::make('Legalisir Antrean', $legalisirMenunggu)
-                ->description('Permohonan butuh diproses/verifikasi')
-                ->descriptionIcon('heroicon-m-clock')
-                ->color($legalisirMenunggu > 0 ? 'warning' : 'gray'),
+            Stat::make('Legalisir Bulan Ini', $legalisirBulanIni)
+                ->description('Total layanan legalisir yang dicatat')
+                ->descriptionIcon('heroicon-m-document-check')
+                ->color('info'),
 
             Stat::make('Calon Kenaikan Pangkat', $calonKp)
                 ->description('Pegawai masuk estimasi 4 tahun')

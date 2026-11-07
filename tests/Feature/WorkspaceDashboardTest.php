@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Filament\Pages\BackupManager;
 use App\Filament\Resources\GajiBerkalaResource\Pages\ListGajiBerkalas;
-use App\Filament\Resources\LegalisirResource\Pages\ListLegalisirs;
 use App\Filament\Resources\UserResource;
 use App\Filament\Widgets\WorkspaceOverviewWidget;
 use App\Models\GajiBerkala;
@@ -33,13 +32,14 @@ class WorkspaceDashboardTest extends TestCase
         $this->travelTo(now()->setDate(2026, 10, 15)->setTime(12, 0));
     }
 
-    public function test_prioritas_hanya_surat_aktif_dan_mendahulukan_urgensi_lalu_tanggal(): void
+    public function test_dashboard_menampilkan_catatan_surat_terbaru_tanpa_status_workflow(): void
     {
         $this->incoming('arsip', 'diarsipkan', 'segera', '2026-10-15');
         $this->incoming('selesai', 'selesai', 'segera', '2026-10-15');
         $this->incoming('biasa', 'baru', 'biasa', '2026-10-15');
         $this->incoming('urgent-lama', 'baru', 'segera', '2026-10-10');
-        $incoming = $this->incoming('urgent-terbaru', 'didisposisi', 'segera', '2026-10-14');
+        $this->incoming('urgent-terbaru', 'didisposisi', 'segera', '2026-10-14');
+        $incoming = $this->incoming('terbaru', 'diarsipkan', 'biasa', '2026-10-16');
         $deleted = $this->incoming('terhapus', 'baru', 'segera', '2026-10-15');
         $deleted->delete();
 
@@ -47,25 +47,23 @@ class WorkspaceDashboardTest extends TestCase
         $this->outgoing(2, 'diarsipkan', 'segera', '2026-10-15');
         $this->outgoing(3, 'draf', 'biasa', '2026-10-15');
         $this->outgoing(4, 'draf', 'segera', '2026-10-10');
-        $outgoing = $this->outgoing(5, 'draf', 'segera', '2026-10-14');
+        $this->outgoing(5, 'draf', 'segera', '2026-10-14');
+        $outgoing = $this->outgoing(6, 'diarsipkan', 'biasa', '2026-10-16');
 
         Livewire::test(WorkspaceOverviewWidget::class)
             ->assertViewHas('suratMasuk', fn ($record) => $record->is($incoming))
             ->assertViewHas('suratKeluar', fn ($record) => $record->is($outgoing))
-            ->assertSee('urgent-terbaru')
+            ->assertSee('terbaru')
             ->assertDontSee('urgent-lama');
     }
 
-    public function test_keadaan_kosong_tidak_menyamakan_arsip_dengan_belum_ada_data(): void
+    public function test_keadaan_kosong_berarti_belum_ada_catatan_surat(): void
     {
-        $this->incoming('arsip', 'diarsipkan', 'segera', '2026-10-15');
-        $this->outgoing(1, 'terkirim', 'segera', '2026-10-15');
-
         Livewire::test(WorkspaceOverviewWidget::class)
             ->assertViewHas('suratMasuk', null)
             ->assertViewHas('suratKeluar', null)
-            ->assertSee('Tidak ada surat masuk yang menunggu')
-            ->assertSee('Tidak ada konsep yang menunggu')
+            ->assertSee('Belum ada catatan surat masuk')
+            ->assertSee('Belum ada catatan surat keluar')
             ->assertSee('Lihat semua surat masuk')
             ->assertSee('Lihat semua surat keluar');
     }
@@ -97,12 +95,12 @@ class WorkspaceDashboardTest extends TestCase
             ->assertViewHas('attention', function ($items) use (&$attention) {
                 $attention = $items;
 
-                return array_column($items, 'count') === [2, 3];
+                return array_column($items, 'count') === [3];
             })
             ->assertViewHas('workflows', function (array $workflows): bool {
                 $byLabel = collect($workflows)->keyBy('label');
 
-                return array_column($byLabel['Legalisir']['stages'], 'count') === [1, 1, 0, 1, 0]
+                return $byLabel->keys()->all() === ['Kenaikan Pangkat', 'Gaji Berkala']
                     && array_column($byLabel['Gaji Berkala']['stages'], 'count') === [3, 0, 1];
             });
 
@@ -112,11 +110,7 @@ class WorkspaceDashboardTest extends TestCase
             return $query;
         };
 
-        Livewire::withQueryParams($params(0))->test(ListLegalisirs::class)
-            ->assertCanSeeTableRecords($pending)
-            ->assertCanNotSeeTableRecords([$completed]);
-
-        Livewire::withQueryParams($params(1))->test(ListGajiBerkalas::class)
+        Livewire::withQueryParams($params(0))->test(ListGajiBerkalas::class)
             ->assertCanSeeTableRecords($kgb->push($outside))
             ->assertCanNotSeeTableRecords([$delivered]);
     }

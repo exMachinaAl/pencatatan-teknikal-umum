@@ -1,5 +1,7 @@
 # Analisis dan pembaruan proses bisnis
 
+> Status: dokumen historis sebelum keputusan customer tanggal 7 November 2026. Alur Surat Masuk, Surat Keluar, dan Legalisir di bawah sudah digantikan oleh pencatatan pasif. Panduan aktif ada di `docs/WORKFLOW-PERSURATAN-LEGALISIR.md`.
+
 Tanggal: 26 Oktober 2026 (Asia/Jakarta).
 
 ## Kesimpulan analisis

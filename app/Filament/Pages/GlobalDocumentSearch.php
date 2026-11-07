@@ -52,6 +52,7 @@ class GlobalDocumentSearch extends Page
                     $query->where('nomor_agenda', 'like', $like)
                         ->orWhere('nomor_surat', 'like', $like)
                         ->orWhere('pengirim', 'like', $like)
+                        ->orWhere('lokasi_arsip_fisik', 'like', $like)
                         ->orWhereHas('klasifikasi', fn ($classification) => $classification
                             ->where('kode', 'like', $like)
                             ->orWhere('nama', 'like', $like));
@@ -63,9 +64,10 @@ class GlobalDocumentSearch extends Page
                     'title' => $record->pengirim,
                     'meta' => collect([
                         $record->klasifikasi?->kode ? 'Klasifikasi '.$record->klasifikasi->kode : null,
+                        $record->lokasi_arsip_fisik ? 'Lokasi '.$record->lokasi_arsip_fisik : null,
                         $record->tanggal_diterima?->format('d/m/Y'),
                     ])->filter()->implode(' · '),
-                    'status' => SuratMasuk::STATUSES[$record->status] ?? $record->status,
+                    'badge' => 'Arsip tercatat',
                     'url' => SuratMasukResource::getUrl('view', ['record' => $record]),
                 ]));
 
@@ -74,6 +76,7 @@ class GlobalDocumentSearch extends Page
                 ->where(function ($query) use ($like) {
                     $query->where('nomor_surat', 'like', $like)
                         ->orWhere('tujuan', 'like', $like)
+                        ->orWhere('lokasi_arsip_fisik', 'like', $like)
                         ->orWhereHas('klasifikasi', fn ($classification) => $classification
                             ->where('kode', 'like', $like)
                             ->orWhere('nama', 'like', $like));
@@ -85,9 +88,10 @@ class GlobalDocumentSearch extends Page
                     'title' => $record->tujuan,
                     'meta' => collect([
                         $record->klasifikasi?->kode ? 'Klasifikasi '.$record->klasifikasi->kode : null,
+                        $record->lokasi_arsip_fisik ? 'Lokasi '.$record->lokasi_arsip_fisik : null,
                         $record->tanggal_surat?->format('d/m/Y'),
                     ])->filter()->implode(' · '),
-                    'status' => SuratKeluar::STATUSES[$record->status] ?? $record->status,
+                    'badge' => 'Arsip tercatat',
                     'url' => SuratKeluarResource::getUrl('view', ['record' => $record]),
                 ]));
         }
@@ -98,20 +102,22 @@ class GlobalDocumentSearch extends Page
                     $query->where('nomor_legalisir', 'like', $like)
                         ->orWhere('nomor_antrean', 'like', $like)
                         ->orWhere('nama_pemohon', 'like', $like)
+                        ->orWhere('kontak', 'like', $like)
                         ->orWhere('jenis_dokumen', 'like', $like)
                         ->orWhere('lokasi_arsip_fisik', 'like', $like);
                 })
                 ->latest('tanggal_permohonan')->limit(12)->get()
                 ->each(fn (Legalisir $record) => $results->push([
                     'type' => 'Legalisir',
-                    'number' => $record->nomor_antrean ?: $record->nomor_legalisir,
+                    'number' => $record->nomor_legalisir,
                     'title' => $record->nama_pemohon,
                     'meta' => collect([
                         $record->jenis_dokumen,
+                        "Dibawa {$record->jumlah_dibawa}, kembali {$record->jumlah_dikembalikan}, arsip {$record->jumlah_disimpan}",
                         $record->lokasi_arsip_fisik,
                         $record->tanggal_permohonan?->format('d/m/Y'),
                     ])->filter()->implode(' · '),
-                    'status' => Legalisir::STATUSES[$record->status] ?? $record->status,
+                    'badge' => 'Layanan tercatat',
                     'url' => LegalisirResource::getUrl('view', ['record' => $record]),
                 ]));
         }

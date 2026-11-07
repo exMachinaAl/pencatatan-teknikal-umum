@@ -294,11 +294,13 @@ class DocumentWorkflowTest extends TestCase
             'nomor_agenda' => 'SM/2026/0991', 'nomor_surat' => 'KHUSUS-ALFA',
             'tanggal_diterima' => now(), 'pengirim' => 'Instansi Anggrek',
             'klasifikasi_id' => $classification->id,
+            'lokasi_arsip_fisik' => 'Lemari Anggrek A1',
         ]);
         SuratKeluar::create([
             'nomor_surat' => 'SK-KHUSUS-BETA', 'nomor_urut' => 992, 'tahun' => 2026,
             'tanggal_surat' => now(), 'tujuan' => 'Kantor Melati',
             'klasifikasi_id' => $outgoingClassification->id,
+            'lokasi_arsip_fisik' => 'Lemari Melati B2',
         ]);
         $this->legalisir([
             'nama_pemohon' => 'Pemohon Cempaka',
@@ -309,8 +311,10 @@ class DocumentWorkflowTest extends TestCase
         Livewire::test(GlobalDocumentSearch::class)->set('query', '421.77')->assertSee('Instansi Anggrek');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'KHUSUS-ALFA')->assertSee('KHUSUS-ALFA');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'SM/2026/0991')->assertSee('KHUSUS-ALFA');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Lemari Anggrek')->assertSee('Instansi Anggrek');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'Melati')->assertSee('Kantor Melati');
         Livewire::test(GlobalDocumentSearch::class)->set('query', '422.78')->assertSee('Kantor Melati');
+        Livewire::test(GlobalDocumentSearch::class)->set('query', 'Lemari Melati')->assertSee('Kantor Melati');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'Cempaka')->assertSee('Pemohon Cempaka');
         Livewire::test(GlobalDocumentSearch::class)->set('query', 'Loker Cempaka')->assertSee('Pemohon Cempaka');
     }

@@ -6,7 +6,7 @@
                 <h1>Selamat datang, {{ auth()->user()?->name ?? 'Petugas Tata Usaha' }}</h1>
                 <p>{{ $roleLabel }} · Menu dan data ditampilkan sesuai tanggung jawab Anda.</p>
 
-                @if ($canCreateSuratMasuk || $canCreateSuratKeluar)
+                @if ($canCreateSuratMasuk || $canCreateSuratKeluar || $canCreateLegalisir)
                 <div class="tu-hero-actions">
                     @if ($canCreateSuratMasuk)
                     <a href="{{ \App\Filament\Resources\SuratMasukResource::getUrl('create') }}" class="tu-hero-button tu-hero-button--primary">
@@ -16,7 +16,13 @@
                     @endif
                     @if ($canCreateSuratKeluar)
                     <a href="{{ \App\Filament\Resources\SuratKeluarResource::getUrl('create') }}" class="tu-hero-button tu-hero-button--secondary">
-                        Buat surat keluar
+                        Catat surat keluar
+                        <x-filament::icon icon="heroicon-m-arrow-right" />
+                    </a>
+                    @endif
+                    @if ($canCreateLegalisir)
+                    <a href="{{ \App\Filament\Resources\LegalisirResource::getUrl('create') }}" class="tu-hero-button tu-hero-button--secondary">
+                        Catat legalisir
                         <x-filament::icon icon="heroicon-m-arrow-right" />
                     </a>
                     @endif
@@ -35,8 +41,8 @@
         <section class="tu-priority" aria-labelledby="priority-title">
             <div class="tu-section-heading">
                 <div>
-                    <p class="tu-eyebrow">Prioritas terbaru</p>
-                    <h2 id="priority-title">Surat yang perlu dilihat</h2>
+                    <p class="tu-eyebrow">Register arsip</p>
+                    <h2 id="priority-title">Catatan surat terbaru</h2>
                 </div>
                 <span>Maksimal 2 item</span>
             </div>
@@ -46,7 +52,7 @@
                     <div class="tu-letter-topline">
                         <span class="tu-letter-type">Surat masuk</span>
                         @if ($suratMasuk)
-                            <span class="tu-status-dot">{{ \App\Models\SuratMasuk::STATUSES[$suratMasuk->status] ?? $suratMasuk->status }}</span>
+                            <span class="tu-status-dot">Arsip tercatat</span>
                         @endif
                     </div>
 
@@ -58,13 +64,14 @@
                             <span aria-hidden="true">·</span>
                             {{ $suratMasuk->tanggal_diterima?->translatedFormat('d M Y') }}
                         </p>
+                        <p class="tu-letter-meta">{{ $suratMasuk->lokasi_arsip_fisik ?: 'Lokasi fisik belum dicatat' }}</p>
                         <a href="{{ \App\Filament\Resources\SuratMasukResource::getUrl('view', ['record' => $suratMasuk]) }}" class="tu-text-link">
                             Buka surat
                             <x-filament::icon icon="heroicon-m-arrow-up-right" />
                         </a>
                     @else
-                        <h3>Tidak ada surat masuk yang menunggu</h3>
-                        <p class="tu-letter-meta">Surat selesai dan arsip tetap tersedia di daftar surat.</p>
+                        <h3>Belum ada catatan surat masuk</h3>
+                        <p class="tu-letter-meta">Catatan baru akan tampil di sini setelah disimpan.</p>
                         <a href="{{ \App\Filament\Resources\SuratMasukResource::getUrl() }}" class="tu-text-link">Lihat semua surat masuk</a>
                     @endif
                 </article>
@@ -73,7 +80,7 @@
                     <div class="tu-letter-topline">
                         <span class="tu-letter-type">Surat keluar</span>
                         @if ($suratKeluar)
-                            <span class="tu-status-dot">{{ \App\Models\SuratKeluar::STATUSES[$suratKeluar->status] ?? $suratKeluar->status }}</span>
+                            <span class="tu-status-dot">Arsip tercatat</span>
                         @endif
                     </div>
 
@@ -85,13 +92,14 @@
                             <span aria-hidden="true">·</span>
                             {{ $suratKeluar->tanggal_surat?->translatedFormat('d M Y') }}
                         </p>
+                        <p class="tu-letter-meta">{{ $suratKeluar->lokasi_arsip_fisik ?: 'Lokasi fisik belum dicatat' }}</p>
                         <a href="{{ \App\Filament\Resources\SuratKeluarResource::getUrl('view', ['record' => $suratKeluar]) }}" class="tu-text-link">
                             Buka surat
                             <x-filament::icon icon="heroicon-m-arrow-up-right" />
                         </a>
                     @else
-                        <h3>Tidak ada konsep yang menunggu</h3>
-                        <p class="tu-letter-meta">Surat terkirim dan arsip tetap tersedia di daftar surat.</p>
+                        <h3>Belum ada catatan surat keluar</h3>
+                        <p class="tu-letter-meta">Catatan baru akan tampil di sini setelah disimpan.</p>
                         <a href="{{ \App\Filament\Resources\SuratKeluarResource::getUrl() }}" class="tu-text-link">Lihat semua surat keluar</a>
                     @endif
                 </article>

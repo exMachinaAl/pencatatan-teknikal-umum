@@ -3,7 +3,7 @@
         <section class="tu-search-panel">
             <p class="tu-search-eyebrow">Cari lintas layanan</p>
             <h2>Temukan berkas dari satu tempat</h2>
-            <p class="tu-search-description">Cari melalui nomor surat, agenda, pengirim, tujuan, kode klasifikasi, lokasi arsip fisik, nomor antrean, atau nama pemohon.</p>
+            <p class="tu-search-description">Cari melalui nomor surat, agenda, pengirim, tujuan, kode klasifikasi, lokasi arsip fisik, nama pemohon, kontak, atau jenis dokumen.</p>
             <div class="tu-search-input">
                 <x-filament::input.wrapper prefix-icon="heroicon-m-magnifying-glass">
                     <x-filament::input
@@ -41,7 +41,7 @@
                             <strong>{{ $result['title'] }}</strong>
                             <span>{{ $result['meta'] }}</span>
                         </div>
-                        <span class="tu-search-result-status">{{ $result['status'] }}</span>
+                        <span class="tu-search-result-status">{{ $result['badge'] }}</span>
                     </a>
                 @endforeach
             </section>

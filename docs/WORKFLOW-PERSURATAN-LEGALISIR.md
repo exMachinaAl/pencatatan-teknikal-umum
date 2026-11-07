@@ -1,29 +1,40 @@
-# Workflow Persuratan dan Legalisir
+# Pencatatan Pasif Persuratan dan Legalisir
 
-## Operasional harian
+Dokumen ini adalah panduan operasional aktif sejak 7 November 2026. Surat masuk, surat keluar, dan legalisir merupakan register arsip digital untuk tim TU kecil, bukan aplikasi disposisi atau persetujuan.
 
-1. Gunakan **Pencarian Terpadu** untuk menemukan surat atau legalisir tanpa membuka modul satu per satu.
-2. Pada surat masuk, isi penanggung jawab, prioritas, dan tenggat dalam bagian disposisi. Dashboard hanya menampilkan peringatan jika terdapat disposisi terlambat.
-3. Pada surat keluar, pilih surat masuk yang dibalas. Saat menandai terkirim, isi metode, waktu, resi/referensi, dan bukti bila ada. Gunakan **Catat Bukti Diterima** ketika penerima telah mengonfirmasi.
-4. Pada legalisir, pilih kanal notifikasi dan lengkapi kontak yang sesuai. Untuk menandai siap diambil, seluruh checklist verifikasi wajib dicentang.
-5. Berikan tautan/QR pelacakan kepada pemohon. Token adalah rahasia akses status; jangan dibagikan kepada pihak lain.
-6. Saat dokumen diserahkan, catat nama pengambil, hubungannya dengan pemohon, dan unggah bukti serah-terima bila tersedia.
+## Surat masuk
 
-## Lampiran privat
+1. Catat tanggal diterima, nomor surat bila ada, tanggal surat, dan pengirim.
+2. Pilih atau tambahkan kode klasifikasi.
+3. Isi lokasi fisik secara konsisten, misalnya `Lemari A / Rak 2 / Ordner 2026`.
+4. Tambahkan scan privat dan/atau tautan HTTPS bila tersedia.
+5. Simpan. Surat langsung tercatat sebagai arsip; tidak ada disposisi, balasan, atau status tindak lanjut.
 
-- File tersimpan pada disk `local`, bukan direktori publik.
-- Setiap penggantian file utama atau bukti membuat versi baru; versi sebelumnya tetap menjadi arsip.
-- Unduhan hanya melalui endpoint berautentikasi dan permission modul. Pengguna, waktu, IP, serta user-agent dicatat.
+## Surat keluar
 
-## Notifikasi
+1. Catat nomor surat resmi, tanggal, dan tujuan.
+2. Pilih kode klasifikasi dan isi lokasi arsip fisik.
+3. Tambahkan scan final dan/atau tautan HTTPS bila tersedia.
+4. Simpan. Tidak ada tahap draf, terkirim, bukti diterima, atau relasi balasan di UI.
 
-- Perubahan status ke `siap_diambil` membuat outbox satu kali untuk setiap kanal.
-- Jalankan `php artisan notifications:process` secara manual atau lewat scheduler setelah konfigurasi mail produksi selesai.
-- WhatsApp sengaja tidak dikirim sebelum provider dipilih. Record akan berstatus `menunggu_provider`; integrasi provider nantinya mengambil payload dari `notification_outbox` dan memperbarui status pengiriman.
-- Pastikan `APP_URL` memakai alamat aplikasi yang dapat dibuka pemohon agar tautan pada email/QR tidak mengarah ke localhost.
+## Legalisir
 
-## Keamanan dan pemulihan
+1. Catat tanggal layanan, nama, kontak bila ada, status pemohon, jenis dokumen, dan tahun lulus bila diketahui.
+2. Pilih jumlah dokumen yang dibawa, maksimal 6.
+3. Sistem menetapkan satu dokumen disimpan sebagai arsip TU dan menghitung sisanya sebagai dokumen yang dikembalikan. Contoh: dibawa 6, kembali 5, disimpan 1.
+4. Isi lokasi fisik dokumen yang disimpan.
+5. Tambahkan scan, tautan, atau catatan bila tersedia, lalu simpan.
 
-- Token pelacakan disimpan sebagai hash untuk pencarian dan salinan terenkripsi untuk pencetakan ulang.
-- Audit log tidak menyimpan hash atau token terenkripsi.
-- Backup database harus dibuat sebelum migrasi atau restore. Jangan memakai `migrate:fresh` pada database Laragon utama.
+Legalisir tidak mempunyai penolakan, antrean proses, status siap diambil, notifikasi, atau pelacakan publik untuk catatan baru. Data workflow lama tetap disimpan untuk kompatibilitas riwayat, tetapi tidak ditawarkan pada UI operasional.
+
+## Koreksi, pencarian, dan lampiran
+
+- Catatan pasif boleh dikoreksi oleh akun yang mempunyai izin ubah. Perubahan tetap masuk audit log dan dilindungi optimistic locking agar dua akun tidak saling menimpa.
+- Pencarian terpadu mencakup nomor, pihak terkait, klasifikasi, kontak, jenis dokumen, dan lokasi arsip fisik.
+- File lokal disimpan privat. Pratinjau dan unduh memerlukan login, izin modul, serta dicatat pada log akses.
+- Tautan eksternal bersifat opsional dan tampil langsung pada tabel bila diisi.
+- Ekspor CSV/XLSX adalah salinan data yang mudah dibaca, bukan pengganti backup database dan lampiran.
+
+## Proses yang tetap aktif
+
+Kenaikan Pangkat dan Kenaikan Gaji Berkala tetap mempunyai tahapan status karena keduanya benar-benar mewakili pekerjaan yang bergerak sampai diserahkan. Hanya dua proses tersebut yang tampil di bagian proses bisnis dan perhatian pada dashboard.
