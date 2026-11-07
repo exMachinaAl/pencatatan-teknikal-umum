@@ -556,7 +556,7 @@ class RoleAuthorizationTest extends TestCase
             'pengirim' => 'Dinas Pendidikan',
             'perihal' => '',
             'sifat' => 'biasa',
-            'status' => 'baru',
+            'status' => 'diarsipkan',
             'klasifikasi_id' => $classification->id,
         ]);
         $letter = SuratMasuk::where('nomor_surat', 'IN/421.9/2026')->firstOrFail();
@@ -564,7 +564,8 @@ class RoleAuthorizationTest extends TestCase
         Livewire::test(ListSuratMasuks::class)
             ->assertTableColumnExists('pengirim')
             ->assertTableColumnExists('klasifikasi.kode')
-            ->assertTableColumnExists('status')
+            ->assertTableColumnExists('lokasi_arsip_fisik')
+            ->assertTableColumnDoesNotExist('status')
             ->assertTableColumnDoesNotExist('perihal')
             ->assertTableColumnDoesNotExist('sifat');
 
@@ -596,7 +597,7 @@ class RoleAuthorizationTest extends TestCase
 
         $this->get(SuratKeluarResource::getUrl('create'))
             ->assertOk()
-            ->assertSee('Klasifikasi &amp; Arsip Digital', false)
+            ->assertSee('Klasifikasi &amp; Lokasi Arsip', false)
             ->assertSee('Kode Klasifikasi Surat')
             ->assertSee('Softfile Final')
             ->assertDontSee('Perihal Surat')
@@ -621,7 +622,7 @@ class RoleAuthorizationTest extends TestCase
             'tujuan' => 'Dinas Pendidikan',
             'perihal' => '',
             'sifat' => 'biasa',
-            'status' => 'draf',
+            'status' => 'diarsipkan',
             'penandatangan' => null,
             'pembuat_konsep' => null,
             'klasifikasi_id' => $classification->id,
@@ -631,7 +632,8 @@ class RoleAuthorizationTest extends TestCase
         Livewire::test(ListSuratKeluars::class)
             ->assertTableColumnExists('tujuan')
             ->assertTableColumnExists('klasifikasi.kode')
-            ->assertTableColumnExists('status')
+            ->assertTableColumnExists('lokasi_arsip_fisik')
+            ->assertTableColumnDoesNotExist('status')
             ->assertTableColumnDoesNotExist('perihal')
             ->assertTableColumnDoesNotExist('sifat')
             ->searchTable('422.8')
@@ -666,7 +668,7 @@ class RoleAuthorizationTest extends TestCase
             'nomor_surat' => 'OUT/423.1/2026',
             'tujuan' => 'Kantor Cabang',
             'perihal' => '',
-            'status' => 'draf',
+            'status' => 'diarsipkan',
             'pembuat_konsep' => null,
         ]);
 
@@ -717,7 +719,7 @@ class RoleAuthorizationTest extends TestCase
         $this->assertFalse(SuratKeluarResource::canEdit($surat));
     }
 
-    public function test_arsip_dan_record_final_tidak_dapat_diedit_langsung(): void
+    public function test_arsip_pasif_dapat_dikoreksi_dan_record_proses_final_tetap_terkunci(): void
     {
         $this->actingAs($this->user(User::ROLE_KEPALA_TU));
 
@@ -734,38 +736,35 @@ class RoleAuthorizationTest extends TestCase
             'pengambil' => 'Alumni',
         ]);
 
-        $this->assertFalse(SuratMasukResource::canEdit($suratMasuk));
+        $this->assertTrue(SuratMasukResource::canEdit($suratMasuk));
         $this->assertFalse(LegalisirResource::canEdit($legalisir));
-        $this->assertFalse(Gate::forUser(auth()->user())->allows('update', $suratMasuk));
+        $this->assertTrue(Gate::forUser(auth()->user())->allows('update', $suratMasuk));
         $this->assertFalse(Gate::forUser(auth()->user())->allows('update', $legalisir));
     }
 
-    public function test_aksi_titik_tiga_memperbarui_status_tabel_tanpa_reload_manual(): void
+    public function test_surat_keluar_pasif_tidak_menampilkan_aksi_workflow_pengiriman(): void
     {
         $this->actingAs($this->user(User::ROLE_PETUGAS_TU));
         $surat = $this->suratKeluar();
 
         Livewire::test(ListSuratKeluars::class)
             ->assertCanSeeTableRecords([$surat])
-            ->callTableAction('tandai_terkirim', $surat)
-            ->assertHasNoTableActionErrors()
-            ->assertSee('Terkirim');
+            ->assertTableActionDoesNotExist('tandai_terkirim')
+            ->assertTableActionDoesNotExist('arsipkan')
+            ->assertTableActionDoesNotExist('catat_diterima');
 
-        $this->assertSame('terkirim', $surat->refresh()->status);
+        $this->assertSame('draf', $surat->refresh()->status);
     }
 
-    public function test_request_livewire_yang_memaksa_aksi_tersembunyi_tetap_tidak_dijalankan(): void
+    public function test_role_baca_saja_tidak_mendapat_aksi_workflow_yang_sudah_dihapus(): void
     {
         $this->actingAs($this->user(User::ROLE_KEPALA_SEKOLAH));
         $surat = $this->suratKeluar();
 
         Livewire::test(ListSuratKeluars::class)
-            ->set('mountedTableActions', ['tandai_terkirim'])
-            ->set('mountedTableActionsArguments', [[]])
-            ->set('mountedTableActionsData', [[]])
-            ->set('mountedTableActionRecord', (string) $surat->getKey())
-            ->call('callMountedTableAction')
-            ->assertOk();
+            ->assertTableActionDoesNotExist('tandai_terkirim')
+            ->assertTableActionDoesNotExist('arsipkan')
+            ->assertTableActionDoesNotExist('catat_diterima');
 
         $this->assertSame('draf', $surat->refresh()->status);
     }

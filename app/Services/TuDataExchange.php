@@ -38,7 +38,7 @@ final class TuDataExchange
             'surat_masuk' => [
                 'model' => SuratMasuk::class, 'date' => 'tanggal_diterima', 'search' => ['nomor_agenda', 'nomor_surat', 'pengirim', 'lokasi_arsip_fisik'],
                 'columns' => ['nomor_agenda', 'nomor_surat', 'tanggal_surat', 'tanggal_diterima', 'pengirim', 'kode_klasifikasi', 'lokasi_arsip_fisik', 'tautan_gform'],
-                'required' => ['tanggal_diterima', 'pengirim'],
+                'required' => ['tanggal_diterima', 'pengirim', 'lokasi_arsip_fisik'],
                 'dates' => ['tanggal_surat', 'tanggal_diterima'],
                 'enums' => [],
                 'lengths' => ['nomor_agenda' => 50, 'nomor_surat' => 100, 'pengirim' => 200, 'kode_klasifikasi' => 30, 'lokasi_arsip_fisik' => 150, 'tautan_gform' => 500],
@@ -46,7 +46,7 @@ final class TuDataExchange
             'surat_keluar' => [
                 'model' => SuratKeluar::class, 'date' => 'tanggal_surat', 'search' => ['nomor_surat', 'tujuan', 'lokasi_arsip_fisik'],
                 'columns' => ['nomor_surat', 'tanggal_surat', 'tujuan', 'kode_klasifikasi', 'lokasi_arsip_fisik', 'tautan_gform'],
-                'required' => ['nomor_surat', 'tanggal_surat', 'tujuan'],
+                'required' => ['nomor_surat', 'tanggal_surat', 'tujuan', 'lokasi_arsip_fisik'],
                 'dates' => ['tanggal_surat'],
                 'enums' => [],
                 'lengths' => ['nomor_surat' => 100, 'tujuan' => 200, 'kode_klasifikasi' => 30, 'lokasi_arsip_fisik' => 150, 'tautan_gform' => 500],
@@ -405,6 +405,8 @@ final class TuDataExchange
                     $row['klasifikasi_id'] = self::classificationId($kodeKlasifikasi);
                     $row['created_by'] = $userId;
                     $row['sumber'] = 'manual';
+                    $row['status'] = 'diarsipkan';
+                    $row['diarsipkan_pada'] = now();
                     SuratMasuk::create($row);
                 } elseif ($module === 'surat_keluar') {
                     $kodeKlasifikasi = $row['kode_klasifikasi'] ?? null;
@@ -412,6 +414,8 @@ final class TuDataExchange
                     $row['klasifikasi_id'] = self::classificationId($kodeKlasifikasi);
                     $row['created_by'] = $userId;
                     $row['sumber'] = 'manual';
+                    $row['status'] = 'diarsipkan';
+                    $row['diarsipkan_pada'] = now();
                     SuratKeluar::create($row);
                 } else {
                     $row['nomor_legalisir'] = $row['nomor_legalisir'] ?: Legalisir::generateNomorLegalisir((int) substr($row['tanggal_permohonan'], 0, 4));

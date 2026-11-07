@@ -252,8 +252,8 @@ class DocumentWorkflowTest extends TestCase
 
         $csvPath = sys_get_temp_dir().DIRECTORY_SEPARATOR.'surat-tautan-'.uniqid().'.csv';
         file_put_contents($csvPath, implode(PHP_EOL, [
-            'tanggal_diterima,pengirim,kode_klasifikasi,tautan_gform',
-            '2026-10-21,Dinas Pendidikan,421.2,https://docs.google.com/spreadsheets/d/hasil-rapat/edit',
+            'tanggal_diterima,pengirim,kode_klasifikasi,lokasi_arsip_fisik,tautan_gform',
+            '2026-10-21,Dinas Pendidikan,421.2,Lemari A / Rak 1,https://docs.google.com/spreadsheets/d/hasil-rapat/edit',
         ]));
 
         try {

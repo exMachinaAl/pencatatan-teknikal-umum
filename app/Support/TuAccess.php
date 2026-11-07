@@ -66,8 +66,10 @@ final class TuAccess
         $status = $record->getAttribute('status');
 
         return match (true) {
-            $record instanceof SuratMasuk => $status === 'diarsipkan',
-            $record instanceof SuratKeluar => in_array($status, ['terkirim', 'diarsipkan'], true),
+            // Surat masuk/keluar adalah register arsip pasif. Catatan yang sudah
+            // diarsipkan tetap boleh dikoreksi; seluruh perubahan tetap diaudit
+            // dan dilindungi optimistic locking.
+            $record instanceof SuratMasuk, $record instanceof SuratKeluar => false,
             $record instanceof Legalisir => in_array($status, ['diambil', 'ditolak'], true),
             $record instanceof KenaikanPangkat, $record instanceof GajiBerkala => $status === 'diserahkan',
             default => false,

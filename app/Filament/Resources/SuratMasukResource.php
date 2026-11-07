@@ -5,10 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\Concerns\AuthorizesModuleAccess;
 use App\Filament\Resources\SuratMasukResource\Pages;
 use App\Models\AuditLog;
-use App\Models\Disposisi;
 use App\Models\RefKlasifikasiSurat;
 use App\Models\SuratMasuk;
-use App\Support\ConcurrentRecordUpdate;
 use App\Support\SecureCsv;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -17,7 +15,6 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Validation\ValidationException;
 
 class SuratMasukResource extends Resource
 {
@@ -77,8 +74,8 @@ class SuratMasukResource extends Resource
 
                     ])->columns(2),
 
-                Forms\Components\Section::make('Klasifikasi & Arsip Digital')
-                    ->description('Bagian sensitif: lampiran disimpan privat, terikat pada record ini, dan setiap akses unduh/pratinjau dicatat.')
+                Forms\Components\Section::make('Klasifikasi & Lokasi Arsip')
+                    ->description('Catat lokasi fisik terlebih dahulu. Lampiran digital bersifat opsional, disimpan privat, dan setiap aksesnya dicatat.')
                     ->schema([
                         Forms\Components\Select::make('klasifikasi_id')
                             ->label('Kode Klasifikasi Surat')
@@ -109,7 +106,10 @@ class SuratMasukResource extends Resource
 
                         Forms\Components\TextInput::make('lokasi_arsip_fisik')
                             ->label('Lokasi Arsip Fisik')
-                            ->placeholder('Contoh: Lemari A, Rak 2, Ordner 2026'),
+                            ->placeholder('Contoh: Lemari A / Rak 2 / Ordner 2026')
+                            ->helperText('Wajib diisi agar surat dapat ditemukan kembali tanpa membuka berkas satu per satu.')
+                            ->required()
+                            ->maxLength(150),
 
                         Forms\Components\FileUpload::make('file_path')
                             ->label('Softfile Scan Surat (PDF / JPG / PNG)')
@@ -130,59 +130,6 @@ class SuratMasukResource extends Resource
                             ->columnSpanFull(),
                     ])->columns(2),
 
-                Forms\Components\Section::make('Disposisi Pimpinan (Kepala Sekolah / TU)')
-                    ->description('Lembar disposisi tindak lanjut surat')
-                    ->collapsible()
-                    ->collapsed()
-                    ->schema([
-                        Forms\Components\Repeater::make('disposisi')
-                            ->relationship()
-                            ->schema([
-                                Forms\Components\TextInput::make('kepada')
-                                    ->label('Diteruskan Kepada')
-                                    ->placeholder('Contoh: Wakasek Kurikulum, Guru Pembina OSIS')
-                                    ->required(),
-
-                                Forms\Components\Select::make('penanggung_jawab_id')
-                                    ->label('Penanggung Jawab Akun')
-                                    ->relationship('penanggungJawab', 'name')
-                                    ->searchable()
-                                    ->preload(),
-
-                                Forms\Components\Select::make('prioritas')
-                                    ->label('Prioritas')
-                                    ->options(['normal' => 'Normal', 'penting' => 'Penting', 'mendesak' => 'Mendesak'])
-                                    ->default('normal')
-                                    ->required(),
-
-                                Forms\Components\DatePicker::make('batas_waktu')
-                                    ->label('Batas Waktu Selesai')
-                                    ->displayFormat('d/m/Y'),
-
-                                Forms\Components\Textarea::make('instruksi')
-                                    ->label('Instruksi / Catatan Disposisi')
-                                    ->placeholder('Contoh: Mohon koordinasikan dan buat laporan tindak lanjut.')
-                                    ->rows(2)
-                                    ->columnSpanFull(),
-
-                                Forms\Components\Select::make('status')
-                                    ->label('Status Tindak Lanjut')
-                                    ->options(Disposisi::STATUSES)
-                                    ->default('terbuka'),
-
-                                Forms\Components\DateTimePicker::make('selesai_pada')
-                                    ->label('Diselesaikan Pada')
-                                    ->seconds(false),
-
-                                Forms\Components\Textarea::make('catatan_tindak_lanjut')
-                                    ->label('Hasil / Laporan Tindak Lanjut')
-                                    ->rows(2)
-                                    ->columnSpanFull(),
-                            ])
-                            ->columns(2)
-                            ->defaultItems(0)
-                            ->columnSpanFull(),
-                    ]),
             ]);
     }
 
@@ -198,12 +145,12 @@ class SuratMasukResource extends Resource
                             $record->nomor_surat ?: 'Tanpa nomor',
                             $record->klasifikasi?->kode ? "Klasifikasi {$record->klasifikasi->kode}" : null,
                             $record->tanggal_diterima?->translatedFormat('d M Y'),
-                            SuratMasuk::STATUSES[$record->status] ?? $record->status,
+                            $record->lokasi_arsip_fisik ? "Arsip {$record->lokasi_arsip_fisik}" : null,
                         ])->filter()->implode(' · '),
                         'externalAttribute' => 'tautan_gform',
                     ])
                     ->extraCellAttributes(['class' => 'tu-mobile-summary-cell'])
-                    ->hiddenFrom('md'),
+                    ->hiddenFrom('lg'),
 
                 Tables\Columns\TextColumn::make('nomor_surat')
                     ->label('No. Surat Asal')
@@ -212,7 +159,8 @@ class SuratMasukResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->description(fn (SuratMasuk $record) => "Agenda: {$record->nomor_agenda}")
-                    ->visibleFrom('md'),
+                    ->extraAttributes(['class' => 'tu-table-primary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\TextColumn::make('pengirim')
                     ->label('Pengirim')
@@ -221,46 +169,33 @@ class SuratMasukResource extends Resource
                     ->limit(28)
                     ->wrap()
                     ->description(fn (SuratMasuk $record) => $record->tanggal_diterima?->translatedFormat('d M Y'))
-                    ->visibleFrom('md'),
+                    ->extraAttributes(['class' => 'tu-table-primary'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\TextColumn::make('klasifikasi.kode')
                     ->label('Kode Klasifikasi')
                     ->searchable(['kode', 'nama'])
                     ->placeholder('-')
-                    ->visibleFrom('md'),
+                    ->visibleFrom('lg'),
 
-                Tables\Columns\BadgeColumn::make('status')
-                    ->label('Status')
-                    ->colors([
-                        'info' => 'baru',
-                        'warning' => 'didisposisi',
-                        'success' => 'selesai',
-                        'gray' => 'diarsipkan',
-                    ])
-                    ->formatStateUsing(fn ($state) => SuratMasuk::STATUSES[$state] ?? $state)
-                    ->sortable()
-                    ->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
+                    ->label('Lokasi Fisik')
+                    ->searchable()
+                    ->limit(28)
+                    ->wrap()
+                    ->placeholder('Belum dicatat')
+                    ->extraAttributes(['class' => 'tu-table-archive'])
+                    ->visibleFrom('lg'),
 
                 Tables\Columns\ViewColumn::make('document_links')
                     ->label('Lampiran')
                     ->view('filament.tables.columns.document-links', ['externalAttribute' => 'tautan_gform'])
                     ->extraCellAttributes(['class' => 'tu-document-cell'])
-                    ->visibleFrom('md'),
-
-                Tables\Columns\TextColumn::make('lokasi_arsip_fisik')
-                    ->label('Lokasi Fisik')
-                    ->limit(20)
-                    ->placeholder('-')
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->visibleFrom('md'),
+                    ->visibleFrom('lg'),
             ])
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['lampiran', 'klasifikasi']))
             ->defaultSort('tanggal_diterima', 'desc')
             ->filters([
-                Tables\Filters\SelectFilter::make('status')
-                    ->label('Status Surat')
-                    ->options(SuratMasuk::STATUSES),
-
                 Tables\Filters\SelectFilter::make('klasifikasi_id')
                     ->label('Klasifikasi')
                     ->relationship('klasifikasi', 'kode')
@@ -285,35 +220,6 @@ class SuratMasukResource extends Resource
                     Tables\Actions\ViewAction::make()
                         ->label('Lihat detail'),
                     Tables\Actions\EditAction::make(),
-                    Tables\Actions\Action::make('arsipkan')
-                        ->label('Tandai Diarsipkan')
-                        ->icon('heroicon-o-archive-box')
-                        ->color('gray')
-                        ->authorize(fn (): bool => static::resourcePermission('transition'))
-                        ->visible(fn (SuratMasuk $record): bool => in_array($record->status, ['baru', 'selesai'], true))
-                        ->form([
-                            Forms\Components\TextInput::make('lokasi_arsip_fisik')
-                                ->label('Lokasi Fisik Arsip')
-                                ->default(fn (SuratMasuk $record) => $record->lokasi_arsip_fisik)
-                                ->required(),
-                        ])
-                        ->action(function (SuratMasuk $record, array $data) {
-                            static::authorizeResourceAction('transition');
-                            ConcurrentRecordUpdate::run($record, function (SuratMasuk $locked) use ($data): void {
-                                if (! in_array($locked->status, ['baru', 'selesai'], true)) {
-                                    throw ValidationException::withMessages([
-                                        'status' => 'Surat belum dapat diarsipkan karena disposisi masih berjalan.',
-                                    ]);
-                                }
-
-                                $locked->update([
-                                    'status' => 'diarsipkan',
-                                    'lokasi_arsip_fisik' => $data['lokasi_arsip_fisik'],
-                                    'diarsipkan_pada' => now(),
-                                ]);
-                            });
-                        })
-                        ->after(fn ($livewire) => $livewire->resetTable()),
                     Tables\Actions\DeleteAction::make(),
                 ]),
             ])
@@ -334,7 +240,7 @@ class SuratMasukResource extends Resource
 
                             $callback = function () use ($records) {
                                 $handle = fopen('php://output', 'w');
-                                SecureCsv::writeRow($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Kode Klasifikasi', 'Status', 'Lokasi Arsip']);
+                                SecureCsv::writeRow($handle, ['No Agenda', 'No Surat Asal', 'Tgl Surat', 'Tgl Diterima', 'Pengirim', 'Kode Klasifikasi', 'Lokasi Arsip', 'Tautan Lampiran']);
                                 foreach ($records as $row) {
                                     SecureCsv::writeRow($handle, [
                                         $row->nomor_agenda,
@@ -343,8 +249,8 @@ class SuratMasukResource extends Resource
                                         $row->tanggal_diterima?->format('Y-m-d'),
                                         $row->pengirim,
                                         $row->klasifikasi?->kode,
-                                        $row->status,
                                         $row->lokasi_arsip_fisik,
+                                        $row->tautan_gform,
                                     ]);
                                 }
                                 fclose($handle);

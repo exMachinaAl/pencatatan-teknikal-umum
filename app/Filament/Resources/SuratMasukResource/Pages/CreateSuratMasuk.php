@@ -16,6 +16,8 @@ class CreateSuratMasuk extends CreateRecord
     {
         return DB::transaction(function () use ($data): Model {
             $data['created_by'] = Auth::id();
+            $data['status'] = 'diarsipkan';
+            $data['diarsipkan_pada'] = now();
 
             return static::getModel()::create($data);
         });
