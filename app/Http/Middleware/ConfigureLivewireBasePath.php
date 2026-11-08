@@ -6,6 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Illuminate\Routing\Router;
+use Illuminate\Routing\UrlGenerator;
 use Livewire\Livewire;
 use Livewire\Mechanisms\FrontendAssets\FrontendAssets;
 use Livewire\Mechanisms\HandleRequests\HandleRequests;
@@ -13,10 +14,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 class ConfigureLivewireBasePath
 {
-    public function __construct(private readonly Router $router) {}
+    public function __construct(
+        private readonly Router $router,
+        private readonly UrlGenerator $url,
+    ) {}
 
     public function handle(Request $request, Closure $next): Response
     {
+        // APP_URL tetap menjadi fallback untuk CLI. URL browser selalu mengikuti
+        // host, skema, dan prefix request yang telah diproses TrustProxies/TrustHosts.
+        $this->url->useOrigin($request->root());
+        $this->url->useAssetOrigin($request->root());
+
         $scriptRoute = $this->findRoute(FrontendAssets::class.'@returnJavaScriptAsFile');
         $updateRoute = $this->findRoute(HandleRequests::class.'@handleUpdate');
 
