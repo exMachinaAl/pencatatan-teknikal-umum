@@ -24,6 +24,30 @@ class LoginTest extends TestCase
         $response->assertSee('Username atau NIP');
         $response->assertSee('Kata sandi');
         $response->assertSee('Hubungi administrator sekolah.');
+        $response->assertDontSee('fonts.bunny.net', false);
+        $response->assertDontSee('ui-avatars.com', false);
+    }
+
+    public function test_asset_url_mendukung_origin_dengan_subpath_tu(): void
+    {
+        app('url')->useAssetOrigin('http://localhost/tu');
+
+        $this->assertSame(
+            'http://localhost/tu/css/tu-ui-v20-operasional.css',
+            asset('css/tu-ui-v20-operasional.css'),
+        );
+    }
+
+    public function test_reverse_proxy_lokal_bisa_meneruskan_subpath_tu(): void
+    {
+        $response = $this
+            ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+            ->withHeader('X-Forwarded-Prefix', '/tu')
+            ->get('/admin/login');
+
+        $response
+            ->assertOk()
+            ->assertSee('/tu/build/assets/', false);
     }
 
     public function test_form_login_menerima_akun_aktif(): void
@@ -135,6 +159,7 @@ class LoginTest extends TestCase
             ->assertSee('Ruang Kerja Tata Usaha')
             ->assertSee('Administrator Sistem (Fasilitator TI)')
             ->assertSee('Pengaturan dan utilitas')
-            ->assertSee('Catatan surat terbaru');
+            ->assertSee('Catatan surat terbaru')
+            ->assertDontSee('ui-avatars.com', false);
     }
 }

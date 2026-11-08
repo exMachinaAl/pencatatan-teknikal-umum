@@ -3,7 +3,9 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Auth\Login;
+use App\Filament\AvatarProviders\LocalInitialsAvatarProvider;
 use App\Filament\Pages\Dashboard;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -29,6 +31,9 @@ class AdminPanelProvider extends PanelProvider
             ->login(Login::class)
             ->databaseTransactions()
             ->brandName('Sistem Informasi Tata Usaha')
+            // Tidak bergantung pada font/avatar internet; penting untuk LAN sekolah.
+            ->font('Segoe UI', provider: LocalFontProvider::class)
+            ->defaultAvatarProvider(LocalInitialsAvatarProvider::class)
             // Navigasi penuh lebih tahan terhadap kegagalan query daripada SPA:
             // respons error tidak dapat meninggalkan shell panel dalam keadaan kosong.
             ->spa(false)

@@ -56,7 +56,9 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
-    'asset_url' => env('ASSET_URL', '/'),
+    // Null membuat Laravel mengikuti origin dan subpath request (mis. /tu).
+    // Isi ASSET_URL secara eksplisit hanya jika memakai CDN/origin terpisah.
+    'asset_url' => env('ASSET_URL'),
 
     /*
     |--------------------------------------------------------------------------

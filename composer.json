@@ -36,6 +36,9 @@
         }
     },
     "scripts": {
+        "serve:fast": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/serve-fast.ps1",
+        "serve:fast:optimize": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/serve-fast.ps1 -Optimize",
+        "optimize:clear": "@php artisan optimize:clear",
         "post-autoload-dump": [
             "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
             "@php artisan package:discover --ansi",
