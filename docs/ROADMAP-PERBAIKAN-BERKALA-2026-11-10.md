@@ -78,17 +78,17 @@ Kriteria selesai: tidak ada dua keputusan yang dapat saling menimpa pada TMT sam
 
 ### PB-02 — P1 — Pembaruan dependensi dan pemeriksaan regresi
 
-Status: `[ ] Belum`
+Status: `[x] Selesai`
 
 Audit dependensi tanggal 10 November 2026 menemukan 11 advisori Composer pada 6 paket Symfony dan satu advisori npm berlevel high pada `follow-redirects`. Salah satu versi yang terpasang adalah `symfony/http-foundation 7.4.21`; konfigurasi gateway dan pembentukan URL perlu diuji kembali setelah pembaruan.
 
 Rencana perbaikan:
 
-- [ ] Simpan daftar paket dan batas versi perbaikannya sebelum upgrade.
-- [ ] Perbarui lock file dengan perubahan sesempit mungkin.
-- [ ] Jalankan kembali `composer audit --locked` dan `npm audit`.
-- [ ] Uji login, logout, session, CSRF, unduh lampiran, redirect, subdomain, base-path, dan tunnel HTTPS.
-- [ ] Pastikan pembaruan tidak mengubah database atau `.env` deployment.
+- [x] Simpan daftar paket dan batas versi perbaikannya sebelum upgrade.
+- [x] Perbarui lock file hanya pada paket terdampak dan dependensi transitif yang diperlukan.
+- [x] Jalankan kembali `composer audit --locked` dan `npm audit`: keduanya nol advisori.
+- [x] Jalankan seluruh feature test, termasuk autentikasi, session, lampiran privat, redirect, subdomain, base-path, dan tunnel HTTPS.
+- [x] Pastikan pembaruan tidak mengubah database atau `.env` deployment.
 
 Kriteria selesai: advisori yang memiliki versi perbaikan sudah ditutup atau alasan penundaannya terdokumentasi; seluruh pengujian regresi lulus.
 
@@ -237,6 +237,7 @@ Satu tahap sebaiknya memiliki commit sendiri. Jangan mencampur upgrade dependens
 | 2026-11-10 | Baseline | `9ccfbb0` | 97 tes, 814 assertion lulus | Audit dan reproduksi konflik PB-01 dengan database memori; belum ada perubahan perilaku aplikasi. |
 | 2026-11-10 | PB-10 | Belum di-commit | 100 tes, 825 assertion lulus | Seed standar hanya membuat admin; akun demo dan data contoh dipisahkan; password awal role dihapus dari konfigurasi environment. |
 | 2026-11-10 | PB-01 | Tahap PB-01 | 106 tes, 838 assertion lulus | Konflik pegawai+TMT ditolak di model dan database; migration lokal berhasil untuk 3 record tanpa konflik; sinkronisasi kronologis dan idempoten. |
+| 2026-11-10 | PB-02 | Tahap PB-02 | 106 tes, 838 assertion lulus; build Vite lulus | Composer dan npm audit menjadi nol; hanya lock file dependensi yang berubah. |
 
 ## Dokumen terkait
 
