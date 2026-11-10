@@ -12,7 +12,9 @@ use App\Models\SuratMasuk;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\SampleDataSeeder;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
@@ -98,6 +100,70 @@ class DataIntegrityTest extends TestCase
 
         $this->assertSame($new->id, $pegawai->fresh()->golongan_id);
         $this->assertSame('2026-04-01', $pegawai->fresh()->tmt_pangkat_terakhir->toDateString());
+    }
+
+    public function test_kp_menolak_keputusan_pegawai_dan_tmt_sama_meski_jenis_berbeda(): void
+    {
+        [$old, $new] = $this->golonganPair();
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Konflik TMT', 'golongan_id' => $old->id]);
+
+        KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'tmt' => '2027-04-01',
+        ]);
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'pilihan',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'tmt' => '2027-04-01',
+        ]), 'tmt');
+    }
+
+    public function test_kp_menolak_golongan_tujuan_yang_tidak_lebih_tinggi(): void
+    {
+        [$old, $new] = $this->golonganPair();
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Salah Arah', 'golongan_id' => $new->id]);
+
+        $this->assertValidationFails(fn () => KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $new->id,
+            'golongan_baru_id' => $old->id,
+            'mk_tahun' => 12,
+            'mk_bulan' => 0,
+        ]), 'golongan_baru_id');
+    }
+
+    public function test_decision_key_database_menahan_race_condition_tmt_sama(): void
+    {
+        [$old, $new] = $this->golonganPair();
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Race Condition', 'golongan_id' => $old->id]);
+        $promotion = KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'tmt' => '2027-05-01',
+        ]);
+
+        $this->expectException(QueryException::class);
+
+        DB::table('kenaikan_pangkat')->insert([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'pilihan',
+            'decision_key' => $promotion->decision_key,
+            'golongan_lama_id' => $old->id,
+            'golongan_baru_id' => $new->id,
+            'tmt' => '2027-05-01',
+            'status' => 'berkas_disiapkan',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 
     public function test_duplikat_kp_dan_kgb_tetap_ditolak_setelah_record_asli_soft_deleted(): void

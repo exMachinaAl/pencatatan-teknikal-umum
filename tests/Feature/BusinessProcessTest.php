@@ -105,6 +105,92 @@ class BusinessProcessTest extends TestCase
         $this->assertStringContainsString('0 golongan pegawai diperbarui', Artisan::output());
     }
 
+    public function test_sinkronisasi_menerapkan_riwayat_pangkat_berurutan_dan_idempoten(): void
+    {
+        Carbon::setTestNow('2026-01-01 08:00:00');
+        $lama = RefGolongan::create(['kode' => 'III/a', 'pangkat' => 'Penata Muda', 'urutan' => 1]);
+        $tengah = RefGolongan::create(['kode' => 'III/b', 'pangkat' => 'Penata Muda Tk. I', 'urutan' => 2]);
+        $baru = RefGolongan::create(['kode' => 'III/c', 'pangkat' => 'Penata', 'urutan' => 3]);
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Riwayat Berurutan', 'golongan_id' => $lama->id]);
+
+        KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'pilihan',
+            'golongan_lama_id' => $tengah->id,
+            'golongan_baru_id' => $baru->id,
+            'mk_tahun' => 12,
+            'mk_bulan' => 0,
+            'status' => 'sk_terbit',
+            'tmt' => '2026-05-01',
+        ]);
+        KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $lama->id,
+            'golongan_baru_id' => $tengah->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 0,
+            'status' => 'sk_terbit',
+            'tmt' => '2026-04-01',
+        ]);
+
+        Carbon::setTestNow('2026-06-01 00:20:00');
+        Artisan::call('app:sync-effective-promotions');
+
+        $this->assertSame($baru->id, $pegawai->fresh()->golongan_id);
+        $this->assertSame('2026-05-01', $pegawai->fresh()->tmt_pangkat_terakhir->toDateString());
+        $this->assertStringContainsString('2 golongan pegawai diperbarui', Artisan::output());
+
+        Artisan::call('app:sync-effective-promotions');
+        $this->assertSame($baru->id, $pegawai->fresh()->golongan_id);
+        $this->assertStringContainsString('0 golongan pegawai diperbarui', Artisan::output());
+    }
+
+    public function test_sinkronisasi_menolak_pangkat_bila_golongan_lama_tidak_cocok(): void
+    {
+        Carbon::setTestNow('2026-06-01 00:20:00');
+        $lama = RefGolongan::create(['kode' => 'III/a', 'pangkat' => 'Penata Muda', 'urutan' => 1]);
+        $tujuan = RefGolongan::create(['kode' => 'III/b', 'pangkat' => 'Penata Muda Tk. I', 'urutan' => 2]);
+        $aktual = RefGolongan::create(['kode' => 'III/c', 'pangkat' => 'Penata', 'urutan' => 3]);
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Master Berbeda', 'golongan_id' => $aktual->id]);
+
+        $promotion = KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_lama_id' => $lama->id,
+            'golongan_baru_id' => $tujuan->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 0,
+            'status' => 'sk_terbit',
+            'tmt' => '2026-05-01',
+        ]);
+
+        $this->assertFalse($promotion->applyEffectiveRank());
+        $this->assertSame($aktual->id, $pegawai->fresh()->golongan_id);
+        $this->assertNull($pegawai->fresh()->tmt_pangkat_terakhir);
+    }
+
+    public function test_record_lama_tanpa_golongan_lama_hanya_dapat_menaikkan_master(): void
+    {
+        Carbon::setTestNow('2026-06-01 00:20:00');
+        $lama = RefGolongan::create(['kode' => 'III/a', 'pangkat' => 'Penata Muda', 'urutan' => 1]);
+        $baru = RefGolongan::create(['kode' => 'III/b', 'pangkat' => 'Penata Muda Tk. I', 'urutan' => 2]);
+        $pegawai = Pegawai::create(['nama' => 'Pegawai Data Lama', 'golongan_id' => $lama->id]);
+
+        KenaikanPangkat::create([
+            'pegawai_id' => $pegawai->id,
+            'jenis' => 'reguler',
+            'golongan_baru_id' => $baru->id,
+            'mk_tahun' => 8,
+            'mk_bulan' => 0,
+            'status' => 'sk_terbit',
+            'tmt' => '2026-05-01',
+        ]);
+
+        $this->assertSame($baru->id, $pegawai->fresh()->golongan_id);
+        $this->assertSame('2026-05-01', $pegawai->fresh()->tmt_pangkat_terakhir->toDateString());
+    }
+
     public function test_legalisir_tidak_dapat_melompati_tahap_verifikasi(): void
     {
         $legalisir = Legalisir::create([

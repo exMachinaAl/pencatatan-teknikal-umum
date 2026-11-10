@@ -54,7 +54,7 @@ Kriteria selesai: instalasi baru memperoleh tepat satu admin, data demo hanya mu
 
 ### PB-01 — P0 — Konflik pengajuan pangkat pada TMT yang sama
 
-Status: `[ ] Belum`
+Status: `[x] Selesai`
 
 Dua pengajuan untuk pegawai yang sama dengan TMT sama tetapi jenis pengajuan berbeda dapat diterima. Jika golongan tujuan berbeda, setiap sinkronisasi dapat menerapkan pengajuan pertama lalu pengajuan kedua. Pengujian sintetis di database memori memperlihatkan golongan pegawai berganti dari tujuan pertama ke tujuan kedua pada setiap siklus.
 
@@ -66,13 +66,13 @@ Lokasi utama:
 
 Rencana perbaikan:
 
-- [ ] Tetapkan aturan bahwa satu pegawai hanya memiliki satu keputusan pangkat efektif untuk satu TMT.
-- [ ] Tolak pengajuan aktif yang bertentangan meskipun `jenis` berbeda.
-- [ ] Pastikan golongan tujuan memiliki urutan lebih tinggi daripada golongan lama untuk proses kenaikan.
-- [ ] Pastikan golongan lama sesuai dengan data master pegawai pada saat keputusan diterapkan.
-- [ ] Buat sinkronisasi idempoten: eksekusi berulang tidak mengubah data lagi.
-- [ ] Tambahkan tes konflik TMT sama, target berbeda, urutan golongan turun, dan sinkronisasi berulang.
-- [ ] Tentukan penanganan data lama yang sudah telanjur konflik sebelum menambahkan constraint database.
+- [x] Tetapkan aturan bahwa satu pegawai hanya memiliki satu keputusan pangkat efektif untuk satu TMT.
+- [x] Tolak pengajuan yang bertentangan meskipun `jenis` berbeda.
+- [x] Pastikan golongan tujuan memiliki urutan lebih tinggi daripada golongan lama untuk proses kenaikan.
+- [x] Pastikan golongan lama sesuai dengan data master pegawai pada saat keputusan diterapkan.
+- [x] Buat sinkronisasi idempoten: eksekusi berulang tidak mengubah data lagi.
+- [x] Tambahkan tes konflik TMT sama, constraint database, urutan golongan turun, mismatch master, data lama, urutan kronologis, dan sinkronisasi berulang.
+- [x] Migration menolak data lama yang konflik sebelum mengubah skema sehingga keputusan dapat diperiksa manual.
 
 Kriteria selesai: tidak ada dua keputusan yang dapat saling menimpa pada TMT sama, sinkronisasi berulang menghasilkan keadaan yang tetap, dan semua tes lama serta tes baru lulus.
 
@@ -236,6 +236,7 @@ Satu tahap sebaiknya memiliki commit sendiri. Jangan mencampur upgrade dependens
 |---|---|---|---|---|
 | 2026-11-10 | Baseline | `9ccfbb0` | 97 tes, 814 assertion lulus | Audit dan reproduksi konflik PB-01 dengan database memori; belum ada perubahan perilaku aplikasi. |
 | 2026-11-10 | PB-10 | Belum di-commit | 100 tes, 825 assertion lulus | Seed standar hanya membuat admin; akun demo dan data contoh dipisahkan; password awal role dihapus dari konfigurasi environment. |
+| 2026-11-10 | PB-01 | Tahap PB-01 | 106 tes, 838 assertion lulus | Konflik pegawai+TMT ditolak di model dan database; migration lokal berhasil untuk 3 record tanpa konflik; sinkronisasi kronologis dan idempoten. |
 
 ## Dokumen terkait
 

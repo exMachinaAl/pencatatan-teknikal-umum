@@ -20,12 +20,12 @@ class SyncEffectivePromotions extends Command
             ->whereNotNull('golongan_baru_id')
             ->whereNotNull('tmt')
             ->whereDate('tmt', '<=', now()->toDateString())
+            ->orderBy('tmt')
             ->orderBy('id')
-            ->chunkById(100, function ($promotions) use (&$applied): void {
-                foreach ($promotions as $promotion) {
-                    if ($promotion->applyEffectiveRank()) {
-                        $applied++;
-                    }
+            ->lazy(100)
+            ->each(function (KenaikanPangkat $promotion) use (&$applied): void {
+                if ($promotion->applyEffectiveRank()) {
+                    $applied++;
                 }
             });
 

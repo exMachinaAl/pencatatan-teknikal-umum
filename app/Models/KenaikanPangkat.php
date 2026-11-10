@@ -114,6 +114,17 @@ class KenaikanPangkat extends Model
                 throw ValidationException::withMessages(['golongan_baru_id' => 'Golongan baru harus berbeda dari golongan lama.']);
             }
 
+            if ($model->golongan_lama_id && $model->golongan_baru_id) {
+                $golonganLama = RefGolongan::query()->find($model->golongan_lama_id);
+                $golonganBaru = RefGolongan::query()->find($model->golongan_baru_id);
+
+                if ($golonganLama && $golonganBaru && (int) $golonganBaru->urutan <= (int) $golonganLama->urutan) {
+                    throw ValidationException::withMessages([
+                        'golongan_baru_id' => 'Golongan tujuan harus memiliki urutan lebih tinggi dari golongan lama.',
+                    ]);
+                }
+            }
+
             $attributes = $model->getAttributes();
             if (! preg_match('/^\d+$/D', (string) ($attributes['mk_tahun'] ?? ''))) {
                 throw ValidationException::withMessages(['mk_tahun' => 'Masa kerja tahun harus berupa bilangan bulat.']);
@@ -129,6 +140,21 @@ class KenaikanPangkat extends Model
             }
 
             $date = $model->tmt ? Carbon::parse($model->tmt)->toDateString() : null;
+
+            if ($date) {
+                $conflictingDecision = static::withTrashed()
+                    ->where('pegawai_id', $model->pegawai_id)
+                    ->whereDate('tmt', $date)
+                    ->when($model->exists, fn ($query) => $query->whereKeyNot($model->getKey()))
+                    ->exists();
+
+                if ($conflictingDecision) {
+                    throw ValidationException::withMessages([
+                        'tmt' => 'Pegawai sudah memiliki pengajuan kenaikan pangkat pada TMT tersebut.',
+                    ]);
+                }
+            }
+
             $integrityKey = static::integrityKey(
                 (int) $model->pegawai_id,
                 (string) $model->jenis,
@@ -151,6 +177,7 @@ class KenaikanPangkat extends Model
             }
 
             $model->integrity_key = $integrityKey;
+            $model->decision_key = static::decisionKey((int) $model->pegawai_id, $date);
         });
 
         static::saved(function (KenaikanPangkat $model): void {
@@ -196,6 +223,24 @@ class KenaikanPangkat extends Model
                 return false;
             }
 
+            if ($promotion->golongan_lama_id
+                && (int) $pegawai->golongan_id !== (int) $promotion->golongan_lama_id
+                && (int) $pegawai->golongan_id !== (int) $promotion->golongan_baru_id) {
+                return false;
+            }
+
+            if (! $promotion->golongan_lama_id
+                && (int) $pegawai->golongan_id !== (int) $promotion->golongan_baru_id) {
+                $golonganSaatIni = RefGolongan::query()->find($pegawai->golongan_id);
+                $golonganTujuan = RefGolongan::query()->find($promotion->golongan_baru_id);
+
+                if (! $golonganSaatIni
+                    || ! $golonganTujuan
+                    || (int) $golonganTujuan->urutan <= (int) $golonganSaatIni->urutan) {
+                    return false;
+                }
+            }
+
             $pegawai->update([
                 'golongan_id' => $promotion->golongan_baru_id,
                 'tmt_pangkat_terakhir' => $date,
@@ -217,6 +262,19 @@ class KenaikanPangkat extends Model
             : "masa-kerja:{$mkTahun}:{$mkBulan}";
 
         return hash('sha256', implode('|', ['kp', $pegawaiId, $jenis, $period]));
+    }
+
+    public static function decisionKey(int $pegawaiId, ?string $tmt): ?string
+    {
+        if (! $tmt) {
+            return null;
+        }
+
+        return hash('sha256', implode('|', [
+            'kp-decision',
+            $pegawaiId,
+            Carbon::parse($tmt)->toDateString(),
+        ]));
     }
 
     public static function jenisLabel(?string $jenis): string
