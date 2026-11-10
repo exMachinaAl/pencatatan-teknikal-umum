@@ -11,6 +11,7 @@ use App\Models\SuratKeluar;
 use App\Models\SuratMasuk;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
+use Database\Seeders\SampleDataSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
@@ -352,9 +353,15 @@ class DataIntegrityTest extends TestCase
         ]), 'tanggal_lahir');
     }
 
-    public function test_database_seeder_data_contoh_aman_dijalankan_ulang(): void
+    public function test_database_seeder_operasional_terpisah_dari_data_contoh_yang_aman_dijalankan_ulang(): void
     {
         $this->seed(DatabaseSeeder::class);
+
+        $this->assertSame(1, User::count());
+        $this->assertSame(User::ROLE_ADMIN, User::sole()->role);
+        $this->assertSame(0, Pegawai::count());
+
+        $this->seed(SampleDataSeeder::class);
 
         $counts = [
             Pegawai::count(),
@@ -365,7 +372,7 @@ class DataIntegrityTest extends TestCase
             Legalisir::count(),
         ];
 
-        $this->seed(DatabaseSeeder::class);
+        $this->seed(SampleDataSeeder::class);
 
         $this->assertSame($counts, [
             Pegawai::count(),

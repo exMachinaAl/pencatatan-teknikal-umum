@@ -1,5 +1,7 @@
 # Checklist Seeder dan Otomasi Kenaikan Pangkat
 
+> Catatan 10 November 2026: bagian akun dan password pada dokumen ini adalah riwayat mekanisme lama. Mekanisme aktif hanya membuat satu admin awal dan tidak lagi memakai `TU_*_INITIAL_PASSWORD`. Gunakan [MEKANISME-AKUN-DAN-SEEDER.md](MEKANISME-AKUN-DAN-SEEDER.md) sebagai panduan terkini. Bagian otomasi pangkat di bawah tetap dipertahankan sebagai catatan historis.
+
 Tanggal pemeriksaan: 26 Oktober 2026
 
 ## 1. Ringkasan perubahan

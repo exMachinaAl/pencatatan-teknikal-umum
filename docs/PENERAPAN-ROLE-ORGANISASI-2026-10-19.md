@@ -1,5 +1,7 @@
 # Penerapan Struktur Role Organisasi
 
+> Catatan 10 November 2026: daftar password awal berbasis `.env` pada dokumen ini telah digantikan. Panduan aktif tersedia di [MEKANISME-AKUN-DAN-SEEDER.md](MEKANISME-AKUN-DAN-SEEDER.md).
+
 Tanggal penerapan: 19 Oktober 2026  
 Metode: diterapkan langsung pada source code, `.env`, dan database lokal tanpa upgrader.
 

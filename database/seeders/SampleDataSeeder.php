@@ -25,6 +25,8 @@ class SampleDataSeeder extends Seeder
             return;
         }
 
+        $this->call(DemoUserSeeder::class);
+
         DB::transaction(function (): void {
             $accounts = $this->seedAdditionalAccounts();
             $employees = $this->seedEmployees();

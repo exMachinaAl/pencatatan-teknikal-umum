@@ -72,21 +72,21 @@ Aplikasi web modern berbasis **Laravel 10** dan **Filament 3** yang dirancang kh
 
 ---
 
-## 👥 Akun Bawaan Lokal (Default Credentials)
+## Akun Awal dan Akun Demo
 
-Seeder membuat lima akun lokal berikut. Administrator Sistem berada di Divisi IT sebagai fasilitator teknis dan bukan atasan operasional TU. Kepala TU adalah pimpinan tertinggi di lingkungan TU. Dua role tambahan (`kepegawaian` dan `auditor`) dapat diberikan Administrator Sistem kepada pengguna nyata melalui menu Kelola Pengguna.
+Seeder standar hanya membuat satu akun Administrator Sistem. Pada lingkungan lokal/testing, akun ini memakai username `admin` dan password development `password`. Pada production baru, seeder meminta password rahasia minimal 12 karakter secara interaktif. Password awal tidak disimpan di `.env`, tidak dicetak ke terminal, dan tidak diubah ketika seeder dijalankan ulang.
 
-> Pada lingkungan lokal, akun baru memakai fallback `password`. Pada production, setiap variabel password awal di `.env` wajib diisi dan sebaiknya berbeda. Menjalankan `UserSeeder` ulang tidak mengubah password, role, atau status akun yang sudah ada.
+Setelah login, Administrator Sistem membuat akun Kepala TU, Kepala Sekolah, Petugas TU, Kepegawaian, Auditor, atau Pegawai melalui menu **Kelola Pengguna**. Setiap akun memperoleh username dan passwordnya sendiri.
 
-| Peran (Role) | Username | Email Lama | Kata Sandi | Hak Akses Utama |
-|---|---|---|---|---|
-| **Administrator Sistem / Fasilitator TI** | `admin` | `admin@tu.sekolah.sch.id` | `.env` | Divisi IT: kelola pengguna, pengaturan, backup, audit teknis, dan pemantauan baca-saja. Bukan pelaksana atau pimpinan TU. |
-| **Kepala Tata Usaha** | `kepala_tu` | `kepala.tu@tu.sekolah.sch.id` | `.env` | Pimpinan operasional tertinggi TU dengan akses seluruh modul kerja TU dan audit. |
-| **Kepala Sekolah** | `kepala_sekolah` | `kepala@tu.sekolah.sch.id` | `.env` | Baca modul operasional dan cetak bukti legalisir; tidak mengubah record langsung. |
-| **Petugas TU** | `staf_tu` | `staf@tu.sekolah.sch.id` | `.env` | Operasional surat masuk/keluar dan legalisir, termasuk impor/ekspor yang diizinkan. |
-| **Pegawai / Guru** | `pegawai` | `pegawai@tu.sekolah.sch.id` | `.env` | Akses panel dasar; portal record pribadi belum dibuka sampai relasi kepemilikan data tersedia. |
+Untuk menyediakan seluruh role dan transaksi contoh pada lingkungan lokal/testing, jalankan secara eksplisit:
 
-Portal menerima username, NIP dari data pegawai yang dihubungkan ke akun, atau email lama. Untuk instalasi skala pribadi, email akun boleh dikosongkan.
+```powershell
+php artisan db:seed --class=SampleDataSeeder
+```
+
+`DemoUserSeeder` menyimpan definisi akun pengujian dan password development di source seeder, terpisah dari instalasi operasional. Seeder demo menolak berjalan di production.
+
+Portal menerima username, NIP dari data pegawai yang dihubungkan ke akun, atau email lama. Untuk instalasi skala pribadi, email akun boleh dikosongkan. Penjelasan lengkap tersedia di [docs/MEKANISME-AKUN-DAN-SEEDER.md](docs/MEKANISME-AKUN-DAN-SEEDER.md).
 
 ---
 

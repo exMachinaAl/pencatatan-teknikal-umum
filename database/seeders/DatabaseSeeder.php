@@ -16,7 +16,6 @@ class DatabaseSeeder extends Seeder
             KlasifikasiSuratSeeder::class,
             UserSeeder::class,
             AppSettingSeeder::class,
-            SampleDataSeeder::class,
         ]);
     }
 }

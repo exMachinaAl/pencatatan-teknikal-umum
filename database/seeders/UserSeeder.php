@@ -7,138 +7,90 @@ use Illuminate\Database\Seeder;
 
 class UserSeeder extends Seeder
 {
-    private function initialPassword(string $username): string
-    {
-        $key = match ($username) {
-            'admin' => 'TU_ADMIN_SISTEM_INITIAL_PASSWORD',
-            'kepala_tu' => 'TU_KEPALA_TU_INITIAL_PASSWORD',
-            'kepala_sekolah' => 'TU_KEPALA_SEKOLAH_INITIAL_PASSWORD',
-            'staf_tu' => 'TU_PETUGAS_TU_INITIAL_PASSWORD',
-            'kepegawaian' => 'TU_KEPEGAWAIAN_INITIAL_PASSWORD',
-            'auditor' => 'TU_AUDITOR_INITIAL_PASSWORD',
-            'pegawai' => 'TU_PEGAWAI_INITIAL_PASSWORD',
-        };
-        $password = trim((string) config("security.initial_passwords.{$username}"));
+    /**
+     * Kredensial lokal/testing sengaja berada di seeder, bukan di .env.
+     * Production selalu meminta password rahasia ketika admin pertama dibuat.
+     */
+    public const LOCAL_TEST_PASSWORD = 'password';
 
-        if ($password === '' && app()->environment('production')) {
-            throw new \RuntimeException("{$key} wajib diisi dengan password unik sebelum menjalankan seeder production.");
-        }
-
-        if (app()->environment('production') && mb_strlen($password) < 12) {
-            throw new \RuntimeException("{$key} wajib berisi minimal 12 karakter pada production.");
-        }
-
-        return $password !== '' ? $password : 'password';
-    }
+    private const ADMIN = [
+        'name' => 'Administrator Sistem (Divisi IT)',
+        'username' => 'admin',
+        'email' => 'admin@tu.sekolah.sch.id',
+        'nomor_telepon' => '081200000001',
+        'jabatan' => 'Administrator Infrastruktur',
+        'unit_kerja' => 'Divisi IT',
+        'role' => User::ROLE_ADMIN,
+        'is_active' => true,
+    ];
 
     public function run(): void
     {
-        $users = [
-            [
-                'name' => 'Administrator Sistem (Divisi IT)',
-                'username' => 'admin',
-                'email' => 'admin@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000001',
-                'jabatan' => 'Administrator Infrastruktur',
-                'unit_kerja' => 'Divisi IT',
-                'password' => $this->initialPassword('admin'),
-                'role' => User::ROLE_ADMIN,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Kepala Tata Usaha',
-                'username' => 'kepala_tu',
-                'email' => 'kepala.tu@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000002',
-                'jabatan' => 'Kepala Tata Usaha',
-                'unit_kerja' => 'Tata Usaha',
-                'password' => $this->initialPassword('kepala_tu'),
-                'role' => User::ROLE_KEPALA_TU,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Drs. H. Mulyadi, M.Pd (Kepala Sekolah)',
-                'username' => 'kepala_sekolah',
-                'email' => 'kepala@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000003',
-                'jabatan' => 'Kepala Sekolah',
-                'unit_kerja' => 'Pimpinan Sekolah',
-                'password' => $this->initialPassword('kepala_sekolah'),
-                'role' => User::ROLE_KEPALA_SEKOLAH,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Siti Rahmawati, A.Md (Staf TU)',
-                'username' => 'staf_tu',
-                'email' => 'staf@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000004',
-                'jabatan' => 'Staf Administrasi Persuratan',
-                'unit_kerja' => 'Tata Usaha',
-                'password' => $this->initialPassword('staf_tu'),
-                'role' => User::ROLE_PETUGAS_TU,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Dewi Lestari, S.AP (Petugas Kepegawaian)',
-                'username' => 'kepegawaian',
-                'email' => 'kepegawaian@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000006',
-                'jabatan' => 'Pengelola Administrasi Kepegawaian',
-                'unit_kerja' => 'Tata Usaha',
-                'password' => $this->initialPassword('kepegawaian'),
-                'role' => User::ROLE_KEPEGAWAIAN,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Pengawas Internal Sekolah',
-                'username' => 'auditor',
-                'email' => 'auditor@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000007',
-                'jabatan' => 'Pengawas / Auditor Internal',
-                'unit_kerja' => 'Pengawasan',
-                'password' => $this->initialPassword('auditor'),
-                'role' => User::ROLE_AUDITOR,
-                'is_active' => true,
-            ],
-            [
-                'name' => 'Budi Santoso, S.Pd (Pegawai / Guru)',
-                'username' => 'pegawai',
-                'email' => 'pegawai@tu.sekolah.sch.id',
-                'nomor_telepon' => '081200000005',
-                'jabatan' => 'Guru',
-                'unit_kerja' => 'Tenaga Pendidik',
-                'password' => $this->initialPassword('pegawai'),
-                'role' => User::ROLE_PEGAWAI,
-                'is_active' => true,
-            ],
-        ];
+        $existing = User::withTrashed()
+            ->where('username', self::ADMIN['username'])
+            ->orWhere('email', self::ADMIN['email'])
+            ->first();
 
-        if (app()->environment('production')) {
-            $passwords = array_column($users, 'password');
-            if (count(array_unique($passwords)) !== count($passwords)) {
-                throw new \RuntimeException('Setiap akun bawaan production wajib memakai password awal yang berbeda.');
+        if ($existing) {
+            $this->completeMissingIdentity($existing);
+
+            return;
+        }
+
+        User::create([
+            ...self::ADMIN,
+            'password' => $this->initialAdminPassword(),
+        ]);
+
+        $this->command?->info('Akun administrator awal berhasil dibuat. Buat akun operasional lain melalui menu Kelola Pengguna.');
+    }
+
+    private function completeMissingIdentity(User $admin): void
+    {
+        foreach (['username', 'nomor_telepon', 'jabatan', 'unit_kerja'] as $field) {
+            if (blank($admin->{$field}) && filled(self::ADMIN[$field] ?? null)) {
+                $admin->{$field} = self::ADMIN[$field];
             }
         }
 
-        foreach ($users as $data) {
-            $existing = User::withTrashed()
-                ->where('username', $data['username'])
-                ->orWhere('email', $data['email'])
-                ->first();
-            if ($existing) {
-                foreach (['username', 'nomor_telepon', 'jabatan', 'unit_kerja'] as $field) {
-                    if (blank($existing->{$field}) && filled($data[$field] ?? null)) {
-                        $existing->{$field} = $data[$field];
-                    }
-                }
-                if ($existing->isDirty()) {
-                    $existing->save();
-                }
-
-                continue;
-            }
-
-            User::create($data);
+        if ($admin->isDirty()) {
+            $admin->save();
         }
+    }
+
+    private function initialAdminPassword(): string
+    {
+        if (! app()->environment('production')) {
+            return self::LOCAL_TEST_PASSWORD;
+        }
+
+        if (! $this->command) {
+            throw new \RuntimeException(
+                'Admin pertama belum ada. Jalankan UserSeeder secara interaktif untuk menentukan password awal: php artisan db:seed --class=UserSeeder --force'
+            );
+        }
+
+        $password = (string) $this->command->secret('Password awal administrator (minimal 12 karakter)');
+        $confirmation = (string) $this->command->secret('Ulangi password awal administrator');
+
+        if ($password === '') {
+            throw new \RuntimeException(
+                'Password admin belum diberikan. Jalankan UserSeeder secara interaktif tanpa opsi --no-interaction.'
+            );
+        }
+
+        if (mb_strlen($password) < 12) {
+            throw new \RuntimeException('Password awal administrator wajib minimal 12 karakter.');
+        }
+
+        if ($password !== $confirmation) {
+            throw new \RuntimeException('Konfirmasi password administrator tidak cocok.');
+        }
+
+        if ($password === self::LOCAL_TEST_PASSWORD) {
+            throw new \RuntimeException('Password development tidak boleh digunakan pada production.');
+        }
+
+        return $password;
     }
 }
